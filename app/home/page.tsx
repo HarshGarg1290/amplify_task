@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, FormEvent } from "react";
+import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMicrophone, faPlus } from "@fortawesome/free-solid-svg-icons";
 import Navigation from "../components/Navigation";
@@ -8,10 +8,16 @@ import Navigation from "../components/Navigation";
 export default function HomePage() {
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const handleSearch = (e: FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
+	const submitSearch = () => {
+		if (!searchQuery.trim()) return;
 		console.log("Search query:", searchQuery);
 	};
+
+	const handleSearch = (e: React.SyntheticEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		submitSearch();
+	};
+
 
 	const actionItems = [
 		{ label: "View all in-progress deals" },
@@ -31,22 +37,22 @@ export default function HomePage() {
 						<textarea
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !e.shiftKey) {
+									e.preventDefault();
+									submitSearch();
+								}
+							}}
 							placeholder="Ask anything"
 							rows={3}
 							className="flex-1 rounded-xl bg-white/95 text-gray-800 placeholder-gray-400 p-4 resize-none focus:outline-none focus:ring-2 focus:ring-blue-700 focus:bg-white shadow-lg transition-all duration-200"
 						/>
+
 						<button
-							type="submit"
+							type="button"
 							className="w-9 h-9 rounded-full bg-blue-600/50 flex items-center justify-center hover:bg-blue-900/70 transition-colors shrink-0"
 						>
-							<svg
-								className="w-5 h-5 text-white"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<FontAwesomeIcon icon={faMicrophone} />
-							</svg>
+							<FontAwesomeIcon icon={faMicrophone} />
 						</button>
 					</div>
 				</form>
