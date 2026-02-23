@@ -1,39 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { getHostedUILoginUrl } from "@/lib/cognito";
 
-const LoginPage = () => {
-	const router = useRouter();
-	const [step, setStep] = useState<"initial" | "username" | "password">(
-		"initial",
-	);
-	const [username, setUsername] = useState("");
-	const [password, setPassword] = useState("");
+function LoginPageContent() {
+	const searchParams = useSearchParams();
+	const error = searchParams.get("error")
+		? "Authentication failed. Please try again."
+		: "";
 
-	const handleInitialLogin = () => {
-		setStep("username");
-	};
-
-	const handleUsernameNext = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (username.trim()) {
-			setStep("password");
-		}
-	};
-
-	const handlePasswordSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		console.log("Login with:", { username, password });
-		router.push("/home");
-	};
-
-	const handleBack = () => {
-		if (step === "password") {
-			setStep("username");
-		} else if (step === "username") {
-			setStep("initial");
-		}
+	const handleMicrosoftSSO = () => {
+		const loginUrl = getHostedUILoginUrl();
+		window.location.href = loginUrl;
 	};
 
 	return (
@@ -48,107 +27,45 @@ const LoginPage = () => {
 					</h2>
 				</div>
 
-				<div className="relative min-h-[180px]">
-					<div
-						className={`absolute w-full transition-all duration-500 ease-in-out ${
-							step === "initial"
-								? "translate-x-0 opacity-100"
-								: "-translate-x-full opacity-0 pointer-events-none"
-						}`}
-					>
-						<button
-							onClick={handleInitialLogin}
-							className="w-full bg-white text-gray-800 py-3 px-6 rounded-full font-medium shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-blue-800"
-						>
-							Log in
-						</button>
+				{error && (
+					<div className="mb-6 p-3 bg-red-500/20 border border-red-400 rounded-lg text-red-200 text-sm">
+						{error}
 					</div>
+				)}
 
-					<div
-						className={`absolute w-full transition-all duration-500 ease-in-out ${
-							step === "username"
-								? "translate-x-0 opacity-100"
-								: step === "initial"
-									? "translate-x-full opacity-0 pointer-events-none"
-									: "-translate-x-full opacity-0 pointer-events-none"
-						}`}
+				<div className="space-y-4">
+					<button
+						onClick={handleMicrosoftSSO}
+						className="w-full bg-white text-gray-800 py-3 px-6 rounded-full font-medium shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-blue-800 flex items-center justify-center gap-2"
 					>
-						<form onSubmit={handleUsernameNext} className="space-y-4">
-							<div>
-								<label className="block text-white text-sm font-medium mb-2">
-									Username
-								</label>
-								<input
-									type="text"
-									value={username}
-									onChange={(e) => setUsername(e.target.value)}
-									className="w-full px-4 py-3 rounded-full bg-white/90 text-gray-800 focus:outline-none focus:ring-2 focus:ring-white focus:bg-white"
-									placeholder="Enter your username"
-									autoFocus
-									required
-								/>
-							</div>
-							<div className="flex gap-3">
-								<button
-									type="button"
-									onClick={handleBack}
-									className="px-6 py-3 rounded-full font-medium bg-white/20 text-white hover:bg-white/30 transition-all duration-300"
-								>
-									Back
-								</button>
-								<button
-									type="submit"
-									className="flex-1 bg-white text-gray-800 py-3 px-6 rounded-full font-medium shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-blue-800"
-								>
-									Next
-								</button>
-							</div>
-						</form>
-					</div>
+						<svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z" />
+						</svg>
+						Sign in with Microsoft
+					</button>
 
-					<div
-						className={`absolute w-full transition-all duration-500 ease-in-out ${
-							step === "password"
-								? "translate-x-0 opacity-100"
-								: "translate-x-full opacity-0 pointer-events-none"
-						}`}
-					>
-						<form onSubmit={handlePasswordSubmit} className="space-y-4">
-							<div>
-								<label className="block text-white text-sm font-medium mb-2">
-									Password
-								</label>
-								<input
-									type="password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									className="w-full px-4 py-3 rounded-full bg-white/90 text-gray-800 focus:outline-none focus:ring-2 focus:ring-white focus:bg-white"
-									placeholder="Enter your password"
-									autoFocus
-									required
-								/>
-							</div>
-							<div className="flex gap-3">
-								<button
-									type="button"
-									onClick={handleBack}
-									className="px-6 py-3 rounded-full font-medium bg-white/20 text-white hover:bg-white/30 transition-all duration-300"
-								>
-									Back
-								</button>
-								<button
-									type="submit"
-									className="flex-1 bg-white text-gray-800 py-3 px-6 rounded-full font-medium shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-blue-800"
-								>
-									Log in
-								</button>
-							</div>
-						</form>
-					</div>
+					<p className="text-white/70 text-sm text-center mt-4">
+						Sign in with your Microsoft account to continue
+					</p>
 				</div>
 			</div>
 		</div>
 	);
-};
+}
 
-export default LoginPage;
+export default function LoginPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-500 via-blue-600 to-blue-700">
+					<div className="text-center">
+						<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+						<p className="text-white">Loading...</p>
+					</div>
+				</div>
+			}
+		>
+			<LoginPageContent />
+		</Suspense>
+	);
+}
