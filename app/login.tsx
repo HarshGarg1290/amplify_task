@@ -25,8 +25,6 @@ export default function LoginPage() {
 	const handlePasswordSubmit = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		console.log("Login with:", { username, password });
-		// Handle actual login logic here
-		// After successful login, redirect to home
 		router.push("/home");
 	};
 
@@ -51,7 +49,6 @@ export default function LoginPage() {
 				</div>
 
 				<div className="relative min-h-45">
-					{/* Initial State - Log in Button */}
 					<div
 						className={`absolute w-full transition-all duration-500 ease-in-out ${
 							step === "initial"
@@ -67,7 +64,7 @@ export default function LoginPage() {
 						</button>
 					</div>
 
-					{/* Username Step */}
+
 					<div
 						className={`absolute w-full transition-all duration-500 ease-in-out ${
 							step === "username"
@@ -109,8 +106,6 @@ export default function LoginPage() {
 							</div>
 						</form>
 					</div>
-
-					{/* Password Step */}
 					<div
 						className={`absolute w-full transition-all duration-500 ease-in-out ${
 							step === "password"

@@ -35,7 +35,6 @@ export default function Navigation({ activePage }: NavigationProps) {
 		<nav className=" border-b border-white/10">
 			<div className="  px-4 sm:px-6 lg:px-8">
 				<div className="flex items-center justify-between h-14">
-					{/* Logo */}
 					<div className="flex items-center gap-8">
 						<div className="flex items-center gap-3">
 							<span className="text-white font-bold text-lg whitespace-nowrap">
