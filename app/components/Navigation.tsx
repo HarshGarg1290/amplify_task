@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/lib/authContext";
 
 interface NavigationProps {
 	activePage: "home" | "deals";
@@ -11,6 +13,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 	const router = useRouter();
+	const { user, signOut } = useAuth();
 
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
@@ -28,8 +31,12 @@ export default function Navigation({ activePage }: NavigationProps) {
 
 	const handleLogout = () => {
 		setIsDropdownOpen(false);
+		signOut();
 		router.push("/login");
 	};
+
+	const userInitials =
+		user?.email?.split("@")[0]?.substring(0, 2)?.toUpperCase() || "US";
 
 	return (
 		<nav className=" border-b border-white/10">
@@ -46,7 +53,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 						</div>
 
 						<div className="hidden md:flex items-center gap-6">
-							<a
+							<Link
 								href="/home"
 								className={`transition-colors text-sm ${
 									activePage === "home"
@@ -55,8 +62,8 @@ export default function Navigation({ activePage }: NavigationProps) {
 								}`}
 							>
 								Home
-							</a>
-							<a
+							</Link>
+							<Link
 								href="/deals"
 								className={`transition-colors text-sm ${
 									activePage === "deals"
@@ -65,7 +72,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 								}`}
 							>
 								Deals
-							</a>
+							</Link>
 						</div>
 					</div>
 
@@ -74,8 +81,9 @@ export default function Navigation({ activePage }: NavigationProps) {
 							<button
 								onClick={() => setIsDropdownOpen(!isDropdownOpen)}
 								className="text-white text-sm hidden sm:block hover:text-blue-200 transition-all duration-300"
+								title={user?.email || "User"}
 							>
-								JD
+								{userInitials}
 								<span
 									className={`ml-1 inline-block transition-transform duration-300 ${isDropdownOpen ? "rotate-180" : ""}`}
 								>
@@ -84,7 +92,11 @@ export default function Navigation({ activePage }: NavigationProps) {
 							</button>
 
 							{isDropdownOpen && (
-								<div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-lg shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+								<div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+									<div className="px-4 py-2 border-b border-gray-200">
+										<p className="text-xs text-gray-500">Signed in as</p>
+										<p className="text-sm ">{user?.email || user?.username}</p>
+									</div>
 									<button
 										onClick={handleLogout}
 										className="w-full px-4 py-2 text-left text-gray-700 hover:bg-linear-to-r hover:from-blue-50 hover:to-blue-100 transition-all duration-300 text-sm font-medium"
