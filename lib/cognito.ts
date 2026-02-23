@@ -102,13 +102,15 @@ export const getHostedUILoginUrl = (): string => {
 	const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
 	const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
 	const redirectUri = process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI;
+	const scopes =
+		process.env.NEXT_PUBLIC_COGNITO_SCOPES || "openid profile email";
 	const identityProvider =
 		process.env.NEXT_PUBLIC_IDENTITY_PROVIDER || "AzureAD";
 
 	const params = new URLSearchParams({
 		client_id: clientId || "",
 		response_type: "code",
-		scope: "openid email",
+		scope: scopes,
 		redirect_uri: redirectUri || "",
 		identity_provider: identityProvider,
 	});

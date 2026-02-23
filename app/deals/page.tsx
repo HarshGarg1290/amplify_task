@@ -1,8 +1,3 @@
-"use client";
-
-import React from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import Navigation from "../components/Navigation";
 
 export default function DealsPage() {
@@ -46,7 +41,7 @@ export default function DealsPage() {
 				<div className="flex items-center justify-between mb-8">
 					<h1 className="text-white text-2xl font-bold">Deals</h1>
 					<button className="flex items-center gap-2 bg-blue-400 text-white px-4 py-2 rounded-full font-medium  transition-colors">
-						<FontAwesomeIcon icon={faPlus} className="w-4 h-4" />
+						<span className="w-4 h-4 inline-flex items-center justify-center">+</span>
 						<span>Create a new deal</span>
 					</button>
 				</div>

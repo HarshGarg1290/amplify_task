@@ -13,13 +13,55 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getUserFromStorage = (): AuthUser | null => {
+	if (typeof window === "undefined") return null;
+
+	const idToken = localStorage.getItem("idToken");
+	const accessToken = localStorage.getItem("accessToken");
+	const refreshToken = localStorage.getItem("refreshToken");
+
+	if (!idToken || !accessToken) return null;
+
+	try {
+		const parts = idToken.split(".");
+		const decoded = JSON.parse(atob(parts[1]));
+		const currentTime = Math.floor(Date.now() / 1000);
+
+		if (!decoded.exp || decoded.exp <= currentTime) {
+			return null;
+		}
+
+		const displayName =
+			decoded.name ||
+			decoded.given_name ||
+			decoded.preferred_username ||
+			(decoded.email ? decoded.email.split("@")[0] : undefined);
+
+		return {
+			username: decoded.preferred_username || decoded.sub,
+			email: decoded.email || "",
+			name: displayName,
+			idToken,
+			accessToken,
+			refreshToken: refreshToken || "",
+		};
+	} catch {
+		return null;
+	}
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
-	const [user, setUser] = useState<AuthUser | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
+	const [user, setUser] = useState<AuthUser | null>(() => getUserFromStorage());
+	const [isLoading, setIsLoading] = useState(() => getUserFromStorage() === null);
 
 	useEffect(() => {
+		if (user) {
+			setIsLoading(false);
+			return;
+		}
+
 		const checkAuth = async () => {
 			try {
 				const currentUser = await getCurrentUser();
@@ -32,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 		};
 
 		checkAuth();
-	}, []);
+	}, [user]);
 
 	const handleSignOut = () => {
 		cognitoSignOut();

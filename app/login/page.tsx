@@ -6,8 +6,12 @@ import { getHostedUILoginUrl } from "@/lib/cognito";
 
 function LoginPageContent() {
 	const searchParams = useSearchParams();
-	const error = searchParams.get("error")
-		? "Authentication failed. Please try again."
+	const error = searchParams.get("error");
+	const errorDescription = searchParams.get("error_description");
+	const errorMessage = error
+		? `Authentication failed (${error})${
+				errorDescription ? `: ${decodeURIComponent(errorDescription)}` : ""
+		  }`
 		: "";
 
 	const handleMicrosoftSSO = () => {
@@ -27,9 +31,9 @@ function LoginPageContent() {
 					</h2>
 				</div>
 
-				{error && (
+				{errorMessage && (
 					<div className="mb-6 p-3 bg-red-500/20 border border-red-400 rounded-lg text-red-200 text-sm">
-						{error}
+						{errorMessage}
 					</div>
 				)}
 
@@ -55,16 +59,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
 	return (
-		<Suspense
-			fallback={
-				<div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-500 via-blue-600 to-blue-700">
-					<div className="text-center">
-						<div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-						<p className="text-white">Loading...</p>
-					</div>
-				</div>
-			}
-		>
+		<Suspense fallback={null}>
 			<LoginPageContent />
 		</Suspense>
 	);
