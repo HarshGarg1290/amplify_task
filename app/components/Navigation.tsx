@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/authContext";
 
 interface NavigationProps {
-	activePage: "home" | "deals";
+	activePage: "home" | "deals" | "proposal";
 }
 
 export default function Navigation({ activePage }: NavigationProps) {
@@ -72,6 +72,16 @@ export default function Navigation({ activePage }: NavigationProps) {
 								}`}
 							>
 								Deals
+							</Link>
+							<Link
+								href="/proposal"
+								className={`transition-colors text-sm ${
+									activePage === "proposal"
+										? "text-white px-4 py-2 rounded-lg bg-blue-400/40 hover:bg-blue-400/60"
+										: "text-white hover:text-blue-200"
+								}`}
+							>
+								Proposal
 							</Link>
 						</div>
 					</div>
