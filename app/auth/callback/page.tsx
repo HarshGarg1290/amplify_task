@@ -4,6 +4,7 @@ import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/authContext";
 import { exchangeCodeForToken } from "@/lib/cognito";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 function AuthCallbackContent() {
 	const router = useRouter();
@@ -39,9 +40,11 @@ function AuthCallbackContent() {
 				localStorage.setItem("idToken", user.idToken);
 				localStorage.setItem("accessToken", user.accessToken);
 				localStorage.setItem("refreshToken", user.refreshToken);
+				console.info("Authentication completed successfully");
 
 				router.push("/home");
 			} catch (error) {
+				console.error("Authentication callback failed", error);
 				const message =
 					error instanceof Error ? error.message : "Token exchange failed";
 				router.push(
@@ -55,14 +58,20 @@ function AuthCallbackContent() {
 
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700">
-			<p className="text-white text-lg">Completing sign in...</p>
+			<LoadingSpinner size="lg" label="Completing sign in..." />
 		</div>
 	);
 }
 
 export default function AuthCallback() {
 	return (
-		<Suspense fallback={null}>
+		<Suspense
+			fallback={
+				<div className="flex items-center justify-center min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700">
+					<LoadingSpinner size="lg" label="Loading callback..." />
+				</div>
+			}
+		>
 			<AuthCallbackContent />
 		</Suspense>
 	);

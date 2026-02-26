@@ -64,6 +64,21 @@ const getErrorMessage = (payload: unknown, fallback: string): string => {
 	return fallback;
 };
 
+const requestJson = async <T>(url: string, init: RequestInit, fallbackMessage: string): Promise<T> => {
+	const response = await fetch(url, init);
+
+	if (!response.ok) {
+		const rawErrorBody = await response.json().catch(() => ({}));
+		const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
+			rawErrorBody
+		);
+		throw new Error(getErrorMessage(errorBody, `${fallbackMessage} (${response.status})`));
+	}
+
+	const rawPayload = (await response.json()) as unknown;
+	return unwrapApiResponse<T>(rawPayload);
+};
+
 /**
  * Get API Gateway endpoint from environment variable
  * Must be set in .env.local as NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT
@@ -91,25 +106,19 @@ export const initiateAdobeSignAgreement = async (
 	try {
 		const apiEndpoint = getApiEndpoint();
 		const url = `${apiEndpoint}/api/adobe-sign/initiate`;
+		console.info("Initiating Adobe Sign agreement", { quoteId: payload.quoteId });
 
-		const response = await fetch(url, {
+		const data = await requestJson<InitiateResponse>(
+			url,
+			{
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify(payload),
-		});
-
-		if (!response.ok) {
-			const rawErrorBody = await response.json().catch(() => ({}));
-			const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
-				rawErrorBody
-			);
-			throw new Error(getErrorMessage(errorBody, `Failed to initiate Adobe Sign (${response.status})`));
-		}
-
-		const rawPayload = (await response.json()) as unknown;
-		const data = unwrapApiResponse<InitiateResponse>(rawPayload);
+			},
+			"Failed to initiate Adobe Sign"
+		);
 
 		return data;
 	} catch (error) {
@@ -136,24 +145,18 @@ export const getAdobeSignAgreementStatus = async (
 			`${apiEndpoint}/api/adobe-sign/status`
 		);
 		url.searchParams.set("agreementId", agreementId);
+		console.info("Fetching Adobe Sign agreement status", { agreementId });
 
-		const response = await fetch(url.toString(), {
-			method: "GET",
-			headers: {
-				"Content-Type": "application/json",
+		const data = await requestJson<StatusResponse>(
+			url.toString(),
+			{
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
 			},
-		});
-
-		if (!response.ok) {
-			const rawErrorBody = await response.json().catch(() => ({}));
-			const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
-				rawErrorBody
-			);
-			throw new Error(getErrorMessage(errorBody, `Failed to fetch status (${response.status})`));
-		}
-
-		const rawPayload = (await response.json()) as unknown;
-		const data = unwrapApiResponse<StatusResponse>(rawPayload);
+			"Failed to fetch status"
+		);
 		return data;
 	} catch (error) {
 		const message =

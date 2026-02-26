@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authContext";
 import LoginPage from "./login/page";
+import LoadingSpinner from "./components/LoadingSpinner";
 
 export default function Home() {
 	const router = useRouter();
@@ -16,7 +17,11 @@ export default function Home() {
 	}, [isLoading, isAuthenticated, router]);
 
 	if (isLoading) {
-		return null;
+		return (
+			<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center">
+				<LoadingSpinner size="lg" label="Loading session..." />
+			</div>
+		);
 	}
 
 	if (isAuthenticated) {

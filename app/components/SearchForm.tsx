@@ -5,13 +5,10 @@ import { useState } from "react";
 export const SearchForm = () => {
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const submitSearch = () => {
-		if (!searchQuery.trim()) return;
-	};
-
 	const handleSearch = (e: React.SyntheticEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		submitSearch();
+		if (!searchQuery.trim()) return;
+		console.info("Search submitted", { query: searchQuery.trim() });
 	};
 
 	return (
@@ -26,7 +23,8 @@ export const SearchForm = () => {
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
-							submitSearch();
+							if (!searchQuery.trim()) return;
+							console.info("Search submitted", { query: searchQuery.trim() });
 						}
 					}}
 					placeholder="Ask anything"

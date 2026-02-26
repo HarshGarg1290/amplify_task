@@ -9,6 +9,17 @@ type ApiGatewayResult = {
 	body: string;
 };
 
+const corsHeaders = {
+	"Content-Type": "application/json",
+	"Access-Control-Allow-Origin": "*",
+};
+
+const jsonResponse = (statusCode: number, payload: unknown): ApiGatewayResult => ({
+	statusCode,
+	headers: corsHeaders,
+	body: JSON.stringify(payload),
+});
+
 /**
  * Lambda function to initiate an Adobe Sign agreement
  * Triggered by API Gateway from the Next.js client
@@ -78,9 +89,11 @@ const getAccessTokenFromRefreshToken = async (): Promise<string> => {
 
 const getAdobeAccessToken = async (): Promise<string> => {
 	if (ADOBE_SIGN_ACCESS_TOKEN) {
+		console.info("Using static Adobe access token from environment");
 		return ADOBE_SIGN_ACCESS_TOKEN;
 	}
 
+	console.info("Generating Adobe access token from refresh token");
 	return getAccessTokenFromRefreshToken();
 };
 
@@ -139,7 +152,7 @@ const createAgreement = async (
 	);
 
 	const agreementId = createResponse.id;
-	console.log(`Created agreement: ${agreementId}`);
+	console.info("Adobe agreement created", { agreementId, quoteId });
 
 	return {
 		agreementId,
@@ -150,9 +163,8 @@ const createAgreement = async (
 export const handler = async (
 	event: ApiGatewayEvent
 ): Promise<ApiGatewayResult> => {
-	console.log("adobeSignInitiate handler invoked", {
-		body: event.body,
-		requestContext: event.requestContext,
+	console.info("adobeSignInitiate request received", {
+		hasBody: Boolean(event.body),
 	});
 
 	// Validate environment variables
@@ -164,12 +176,9 @@ export const handler = async (
 		!ADOBE_SIGN_LIBRARY_DOCUMENT_ID
 	) {
 		console.error("Missing required Adobe Sign environment variables");
-		return {
-			statusCode: 500,
-			body: JSON.stringify({
-				error: "Server configuration error",
-			}),
-		};
+		return jsonResponse(500, {
+			error: "Server configuration error",
+		});
 	}
 
 	try {
@@ -177,22 +186,21 @@ export const handler = async (
 		const payload: InitiatePayload = JSON.parse(event.body || "{}");
 
 		if (!payload.quoteId || !payload.signerEmail) {
-			return {
-				statusCode: 400,
-				body: JSON.stringify({
-					error: "Missing required fields: quoteId, signerEmail",
-				}),
-			};
+			return jsonResponse(400, {
+				error: "Missing required fields: quoteId, signerEmail",
+			});
 		}
 
 		// Validate email format
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(payload.signerEmail)) {
-			return {
-				statusCode: 400,
-				body: JSON.stringify({ error: "Invalid email format" }),
-			};
+			return jsonResponse(400, { error: "Invalid email format" });
 		}
+
+		console.info("Initiating Adobe agreement", {
+			quoteId: payload.quoteId,
+			signerDomain: payload.signerEmail.split("@")[1] || "unknown",
+		});
 
 		const accessToken = await getAdobeAccessToken();
 
@@ -204,26 +212,16 @@ export const handler = async (
 			payload.signerName
 		);
 
-		return {
-			statusCode: 200,
-			headers: {
-				"Content-Type": "application/json",
-				"Access-Control-Allow-Origin": "*",
-			},
-			body: JSON.stringify(result),
-		};
+		return jsonResponse(200, result);
 	} catch (error) {
 		console.error("adobeSignInitiate error:", error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error occurred";
 
-		return {
-			statusCode: 500,
-			body: JSON.stringify({
-				error: "Unable to initiate Adobe Sign agreement",
-				details: errorMessage,
-			}),
-		};
+		return jsonResponse(500, {
+			error: "Unable to initiate Adobe Sign agreement",
+			details: errorMessage,
+		});
 	}
 };

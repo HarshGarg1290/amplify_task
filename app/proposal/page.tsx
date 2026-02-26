@@ -12,6 +12,7 @@ import { HiOutlineWrenchScrewdriver } from "react-icons/hi2";
 import { IoIosLink } from "react-icons/io";
 import { GiGraduateCap } from "react-icons/gi";
 import AcceptAndSignButton from "../components/AcceptAndSignButton";
+import { ProtectedRoute } from "@/lib/ProtectedRoute";
 const lineItems = [
 	{
 		item: "Pathology Scanner SG300",
@@ -147,11 +148,12 @@ const scopeMilestones = [
 
 export default function ProposalPage() {
 	return (
-		<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 proposal-heading">
-			<Navigation activePage="proposal" />
+		<ProtectedRoute>
+			<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 proposal-heading">
+				<Navigation activePage="proposal" />
 
-			<div className="border-t border-blue-400/50">
-				<div className="bg-white rounded-sm overflow-hidden shadow-lg ">
+				<div className="border-t border-blue-400/50">
+					<div className="bg-white rounded-sm overflow-hidden shadow-lg ">
 					<div className="flex justify-between bg-linear-to-r from-blue-900 via-blue-800 to-blue-600 px-6 py-8 text-white">
                         <div>
                             <div className="text-xs uppercase tracking-wider text-blue-100 mb-2">
@@ -449,7 +451,8 @@ export default function ProposalPage() {
 						</div>
 					</div>
 				</div>
+				</div>
 			</div>
-		</div>
+		</ProtectedRoute>
 	);
 }

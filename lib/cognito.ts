@@ -21,10 +21,81 @@ export interface AuthUser {
 	refreshToken: string;
 }
 
-export const signOut = (): void => {
+type IdTokenPayload = {
+	exp?: number;
+	sub?: string;
+	email?: string;
+	name?: string;
+	given_name?: string;
+	preferred_username?: string;
+};
+
+const decodeBase64Url = (value: string): string => {
+	const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+	const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+	return atob(padded);
+};
+
+const decodeIdTokenPayload = (idToken: string): IdTokenPayload | null => {
+	try {
+		const parts = idToken.split(".");
+		if (parts.length < 2) {
+			return null;
+		}
+		return JSON.parse(decodeBase64Url(parts[1])) as IdTokenPayload;
+	} catch {
+		return null;
+	}
+};
+
+const getDisplayName = (payload: IdTokenPayload): string | undefined => {
+	return (
+		payload.name ||
+		payload.given_name ||
+		payload.preferred_username ||
+		(payload.email ? payload.email.split("@")[0] : undefined)
+	);
+};
+
+export const clearStoredTokens = (): void => {
 	localStorage.removeItem("idToken");
 	localStorage.removeItem("accessToken");
 	localStorage.removeItem("refreshToken");
+};
+
+export const getUserFromStoredTokens = (): AuthUser | null => {
+	const idToken = localStorage.getItem("idToken");
+	const accessToken = localStorage.getItem("accessToken");
+	const refreshToken = localStorage.getItem("refreshToken");
+
+	if (!idToken || !accessToken) {
+		return null;
+	}
+
+	const payload = decodeIdTokenPayload(idToken);
+	if (!payload) {
+		clearStoredTokens();
+		return null;
+	}
+
+	const currentTime = Math.floor(Date.now() / 1000);
+	if (!payload.exp || payload.exp <= currentTime) {
+		clearStoredTokens();
+		return null;
+	}
+
+	return {
+		username: payload.preferred_username || payload.sub || "",
+		email: payload.email || "",
+		name: getDisplayName(payload),
+		idToken,
+		accessToken,
+		refreshToken: refreshToken || "",
+	};
+};
+
+export const signOut = (): void => {
+	clearStoredTokens();
 
 	const cognitoUser = userPool.getCurrentUser();
 	if (cognitoUser) {
@@ -34,38 +105,10 @@ export const signOut = (): void => {
 
 export const getCurrentUser = (): Promise<AuthUser | null> => {
 	return new Promise((resolve) => {
-		const idToken = localStorage.getItem("idToken");
-		const accessToken = localStorage.getItem("accessToken");
-		const refreshToken = localStorage.getItem("refreshToken");
-
-		if (idToken && accessToken) {
-			try {
-				const parts = idToken.split(".");
-				const decoded = JSON.parse(atob(parts[1]));
-
-				const currentTime = Math.floor(Date.now() / 1000);
-				if (decoded.exp && decoded.exp > currentTime) {
-					const displayName =
-						decoded.name ||
-						decoded.given_name ||
-						decoded.preferred_username ||
-						(decoded.email ? decoded.email.split("@")[0] : undefined);
-
-					resolve({
-						username: decoded.preferred_username || decoded.sub,
-						email: decoded.email || "",
-						name: displayName,
-						idToken,
-						accessToken,
-						refreshToken: refreshToken || "",
-					});
-					return;
-				}
-			} catch (error) {
-				localStorage.removeItem("idToken");
-				localStorage.removeItem("accessToken");
-				localStorage.removeItem("refreshToken");
-			}
+		const storedUser = getUserFromStoredTokens();
+		if (storedUser) {
+			resolve(storedUser);
+			return;
 		}
 
 		const cognitoUser = userPool.getCurrentUser();
@@ -77,6 +120,7 @@ export const getCurrentUser = (): Promise<AuthUser | null> => {
 		cognitoUser.getSession(
 			(err: Error | undefined, session: CognitoUserSession | null) => {
 				if (err || !session?.isValid()) {
+					clearStoredTokens();
 					resolve(null);
 					return;
 				}

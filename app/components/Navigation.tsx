@@ -35,8 +35,9 @@ export default function Navigation({ activePage }: NavigationProps) {
 		router.push("/login");
 	};
 
+	const displayIdentity = user?.name || user?.email || "";
 	const userInitials =
-		user?.email?.split("@")[0]?.substring(0, 2)?.toUpperCase() || "US";
+		displayIdentity.substring(0, 2).toUpperCase() || "--";
 
 	return (
 		<nav className=" border-b border-white/10">
@@ -91,7 +92,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 							<button
 								onClick={() => setIsDropdownOpen(!isDropdownOpen)}
 								className="text-white text-sm hidden sm:block hover:text-blue-200 transition-all duration-300"
-								title={user?.email || "User"}
+								title={displayIdentity}
 							>
 								{userInitials}
 								<span
@@ -105,7 +106,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 								<div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
 									<div className="px-4 py-2 border-b border-gray-200">
 										<p className="text-xs text-gray-500">Signed in as</p>
-										<p className="text-sm ">{user?.email || user?.username}</p>
+										<p className="text-sm ">{user?.email || "-"}</p>
 									</div>
 									<button
 										onClick={handleLogout}

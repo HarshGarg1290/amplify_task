@@ -1,6 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handler = void 0;
+const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+};
+const jsonResponse = (statusCode, payload) => ({
+    statusCode,
+    headers: corsHeaders,
+    body: JSON.stringify(payload),
+});
 const ADOBE_SIGN_BASE_URI = process.env.ADOBE_SIGN_BASE_URI || "https://api.na1.adobesign.com";
 const ADOBE_SIGN_ACCESS_TOKEN = process.env.ADOBE_SIGN_ACCESS_TOKEN;
 const ADOBE_SIGN_CLIENT_ID = process.env.ADOBE_SIGN_CLIENT_ID;
@@ -40,8 +49,10 @@ const getAccessTokenFromRefreshToken = async () => {
 };
 const getAdobeAccessToken = async () => {
     if (ADOBE_SIGN_ACCESS_TOKEN) {
+        console.info("Using static Adobe access token from environment");
         return ADOBE_SIGN_ACCESS_TOKEN;
     }
+    console.info("Generating Adobe access token from refresh token");
     return getAccessTokenFromRefreshToken();
 };
 const callAdobeSignAPI = async (accessToken, path, init) => {
@@ -60,38 +71,29 @@ const callAdobeSignAPI = async (accessToken, path, init) => {
     return (await response.json());
 };
 const handler = async (event) => {
-    console.log("adobeSignStatus handler invoked", {
-        queryStringParameters: event.queryStringParameters,
+    console.info("adobeSignStatus request received", {
+        hasAgreementId: Boolean(event.queryStringParameters?.agreementId),
     });
     if (!ADOBE_SIGN_ACCESS_TOKEN &&
         (!ADOBE_SIGN_CLIENT_ID || !ADOBE_SIGN_CLIENT_SECRET || !ADOBE_SIGN_REFRESH_TOKEN)) {
         console.error("Missing OAuth environment variables for Adobe Sign");
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                error: "Server configuration error",
-            }),
-        };
+        return jsonResponse(500, {
+            error: "Server configuration error",
+        });
     }
     try {
         // Get agreementId from query parameter
         const agreementId = event.queryStringParameters?.agreementId;
         if (!agreementId) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({
-                    error: "Missing required parameter: agreementId",
-                }),
-            };
+            return jsonResponse(400, {
+                error: "Missing required parameter: agreementId",
+            });
         }
         // Validate agreementId format (basic check)
         if (agreementId.length === 0 || agreementId.length > 128) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({
-                    error: "Invalid agreementId format",
-                }),
-            };
+            return jsonResponse(400, {
+                error: "Invalid agreementId format",
+            });
         }
         const accessToken = await getAdobeAccessToken();
         // Fetch agreement status from Adobe Sign
@@ -115,25 +117,19 @@ const handler = async (event) => {
             displayDate: agreement.displayDate,
             signedDate: agreement.signedDate,
         };
-        return {
-            statusCode: 200,
-            headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-            body: JSON.stringify(result),
-        };
+        console.info("Adobe agreement status fetched", {
+            agreementId,
+            status: result.status,
+        });
+        return jsonResponse(200, result);
     }
     catch (error) {
         console.error("adobeSignStatus error:", error);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                error: "Unable to fetch agreement status",
-                details: errorMessage,
-            }),
-        };
+        return jsonResponse(500, {
+            error: "Unable to fetch agreement status",
+            details: errorMessage,
+        });
     }
 };
 exports.handler = handler;

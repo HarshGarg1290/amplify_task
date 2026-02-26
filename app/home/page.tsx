@@ -22,7 +22,7 @@ function HomePageContent() {
 					<h2 className="text-white text-xl font-light">
 						Welcome,{" "}
 						<span className="font-semibold">
-							{user?.name || user?.username}
+							{user?.name || user?.email}
 						</span>
 					</h2>
 				</div>

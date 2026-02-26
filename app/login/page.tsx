@@ -1,8 +1,9 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getHostedUILoginUrl } from "@/lib/cognito";
+import LoadingSpinner from "@/app/components/LoadingSpinner";
 
 function LoginPageContent() {
 	const searchParams = useSearchParams();
@@ -13,10 +14,17 @@ function LoginPageContent() {
 				errorDescription ? `: ${decodeURIComponent(errorDescription)}` : ""
 		  }`
 		: "";
+	const [isRedirecting, setIsRedirecting] = useState(false);
 
 	const handleMicrosoftSSO = async () => {
-		const loginUrl = await getHostedUILoginUrl();
-		window.location.href = loginUrl;
+		setIsRedirecting(true);
+		try {
+			const loginUrl = await getHostedUILoginUrl();
+			window.location.href = loginUrl;
+		} catch (error) {
+			setIsRedirecting(false);
+			console.error("Unable to start hosted UI login", error);
+		}
 	};
 
 	return (
@@ -40,12 +48,17 @@ function LoginPageContent() {
 				<div className="space-y-4">
 					<button
 						onClick={handleMicrosoftSSO}
+						disabled={isRedirecting}
 						className="w-full bg-white text-gray-800 py-3 px-6 rounded-full font-medium shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] hover:ring-2 hover:ring-blue-800 flex items-center justify-center gap-2"
 					>
-						<svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z" />
-						</svg>
-						Sign in with Microsoft
+						{isRedirecting ? (
+							<LoadingSpinner size="sm" className="text-blue-900" />
+						) : (
+							<svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z" />
+							</svg>
+						)}
+						{isRedirecting ? "Redirecting..." : "Sign in with Microsoft"}
 					</button>
 
 					<p className="text-white/70 text-sm text-center mt-4">
@@ -59,7 +72,13 @@ function LoginPageContent() {
 
 export default function LoginPage() {
 	return (
-		<Suspense fallback={null}>
+		<Suspense
+			fallback={
+				<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center">
+					<LoadingSpinner size="lg" label="Loading sign-in page..." />
+				</div>
+			}
+		>
 			<LoginPageContent />
 		</Suspense>
 	);

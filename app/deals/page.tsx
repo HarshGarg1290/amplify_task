@@ -1,4 +1,5 @@
 import Navigation from "../components/Navigation";
+import { ProtectedRoute } from "@/lib/ProtectedRoute";
 
 export default function DealsPage() {
 	const dealsData = [
@@ -32,11 +33,11 @@ export default function DealsPage() {
 	];
 
 	return (
-		<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 flex flex-col">
-	
-			<Navigation activePage="deals" />
+		<ProtectedRoute>
+			<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 flex flex-col">
+				<Navigation activePage="deals" />
 
-			<div className="flex-1 mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div className="flex-1 mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
 				<div className="flex items-center justify-between mb-8">
 					<h1 className="text-white text-2xl font-bold">Deals</h1>
@@ -101,7 +102,8 @@ export default function DealsPage() {
 						</tbody>
 					</table>
 				</div>
+				</div>
 			</div>
-		</div>
+		</ProtectedRoute>
 	);
 }

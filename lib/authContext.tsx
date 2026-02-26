@@ -1,80 +1,76 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { AuthUser, getCurrentUser, signOut as cognitoSignOut } from "./cognito";
+import {
+	AuthUser,
+	getCurrentUser,
+	getUserFromStoredTokens,
+	signOut as cognitoSignOut,
+} from "./cognito";
 
 interface AuthContextType {
 	user: AuthUser | null;
 	isLoading: boolean;
 	isAuthenticated: boolean;
 	signOut: () => void;
-	setUser: (user: AuthUser) => void;
+	setUser: (user: AuthUser | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getUserFromStorage = (): AuthUser | null => {
-	if (typeof window === "undefined") return null;
-
-	const idToken = localStorage.getItem("idToken");
-	const accessToken = localStorage.getItem("accessToken");
-	const refreshToken = localStorage.getItem("refreshToken");
-
-	if (!idToken || !accessToken) return null;
-
-	try {
-		const parts = idToken.split(".");
-		const decoded = JSON.parse(atob(parts[1]));
-		const currentTime = Math.floor(Date.now() / 1000);
-
-		if (!decoded.exp || decoded.exp <= currentTime) {
-			return null;
-		}
-
-		const displayName =
-			decoded.name ||
-			decoded.given_name ||
-			decoded.preferred_username ||
-			(decoded.email ? decoded.email.split("@")[0] : undefined);
-
-		return {
-			username: decoded.preferred_username || decoded.sub,
-			email: decoded.email || "",
-			name: displayName,
-			idToken,
-			accessToken,
-			refreshToken: refreshToken || "",
-		};
-	} catch {
-		return null;
-	}
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
-	const [user, setUser] = useState<AuthUser | null>(() => getUserFromStorage());
-	const [isLoading, setIsLoading] = useState(() => getUserFromStorage() === null);
+	const [user, setUser] = useState<AuthUser | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		if (user) {
-			setIsLoading(false);
-			return;
-		}
-
 		const checkAuth = async () => {
 			try {
+				const storedUser = getUserFromStoredTokens();
+				if (storedUser) {
+					setUser(storedUser);
+					return;
+				}
+
 				const currentUser = await getCurrentUser();
 				setUser(currentUser);
-			} catch (error) {
+			} catch {
 				setUser(null);
 			} finally {
 				setIsLoading(false);
 			}
 		};
 
-		checkAuth();
-	}, [user]);
+		void checkAuth();
+	}, []);
+
+	useEffect(() => {
+		if (isLoading) return;
+
+		const validateSession = () => {
+			const storedUser = getUserFromStoredTokens();
+			if (!storedUser && user) {
+				console.info("Session expired. Signing out user.");
+				cognitoSignOut();
+				setUser(null);
+			}
+		};
+
+		const handleVisibility = () => {
+			if (!document.hidden) {
+				validateSession();
+			}
+		};
+
+		const interval = window.setInterval(validateSession, 60000);
+		document.addEventListener("visibilitychange", handleVisibility);
+
+		return () => {
+			window.clearInterval(interval);
+			document.removeEventListener("visibilitychange", handleVisibility);
+		};
+	}, [isLoading, user]);
 
 	const handleSignOut = () => {
 		cognitoSignOut();

@@ -5,6 +5,7 @@ import { TiTick } from "react-icons/ti";
 import { useAuth } from "@/lib/authContext";
 import { initiateAdobeSignAgreement } from "@/lib/adobeSign";
 import { useRouter } from "next/navigation";
+import LoadingSpinner from "./LoadingSpinner";
 
 type Props = {
 	quoteId: string;
@@ -34,12 +35,17 @@ export default function AcceptAndSignButton({ quoteId, className }: Props) {
 			const result = await initiateAdobeSignAgreement({
 				quoteId,
 				signerEmail: user.email,
-				signerName: user.name ?? user.username ?? user.email,
+				signerName: user.name ?? user.email,
 			});
 
 			if (!result.agreementId) {
 				throw new Error("Agreement created but agreement id is missing");
 			}
+
+			console.info("Agreement initiation successful", {
+				agreementId: result.agreementId,
+				quoteId,
+			});
 
 			router.push(
 				`/proposal/status?agreementId=${encodeURIComponent(result.agreementId)}`
@@ -63,7 +69,7 @@ export default function AcceptAndSignButton({ quoteId, className }: Props) {
 				disabled={isSubmitting}
 				className={className}
 			>
-				<TiTick />
+				{isSubmitting ? <LoadingSpinner size="sm" /> : <TiTick />}
 				{isSubmitting
 					? "Preparing Adobe Sign..."
 					: "Accept & Sign Quote"}

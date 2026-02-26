@@ -8,6 +8,17 @@ type ApiGatewayResult = {
 	body: string;
 };
 
+const corsHeaders = {
+	"Content-Type": "application/json",
+	"Access-Control-Allow-Origin": "*",
+};
+
+const jsonResponse = (statusCode: number, payload: unknown): ApiGatewayResult => ({
+	statusCode,
+	headers: corsHeaders,
+	body: JSON.stringify(payload),
+});
+
 /**
  * Lambda function to fetch Adobe Sign agreement status
  * Called by client to poll signing progress
@@ -80,9 +91,11 @@ const getAccessTokenFromRefreshToken = async (): Promise<string> => {
 
 const getAdobeAccessToken = async (): Promise<string> => {
 	if (ADOBE_SIGN_ACCESS_TOKEN) {
+		console.info("Using static Adobe access token from environment");
 		return ADOBE_SIGN_ACCESS_TOKEN;
 	}
 
+	console.info("Generating Adobe access token from refresh token");
 	return getAccessTokenFromRefreshToken();
 };
 
@@ -114,8 +127,8 @@ const callAdobeSignAPI = async <T>(
 export const handler = async (
 	event: ApiGatewayEvent
 ): Promise<ApiGatewayResult> => {
-	console.log("adobeSignStatus handler invoked", {
-		queryStringParameters: event.queryStringParameters,
+	console.info("adobeSignStatus request received", {
+		hasAgreementId: Boolean(event.queryStringParameters?.agreementId),
 	});
 
 	if (
@@ -123,12 +136,9 @@ export const handler = async (
 		(!ADOBE_SIGN_CLIENT_ID || !ADOBE_SIGN_CLIENT_SECRET || !ADOBE_SIGN_REFRESH_TOKEN)
 	) {
 		console.error("Missing OAuth environment variables for Adobe Sign");
-		return {
-			statusCode: 500,
-			body: JSON.stringify({
-				error: "Server configuration error",
-			}),
-		};
+		return jsonResponse(500, {
+			error: "Server configuration error",
+		});
 	}
 
 	try {
@@ -136,22 +146,16 @@ export const handler = async (
 		const agreementId = event.queryStringParameters?.agreementId;
 
 		if (!agreementId) {
-			return {
-				statusCode: 400,
-				body: JSON.stringify({
-					error: "Missing required parameter: agreementId",
-				}),
-			};
+			return jsonResponse(400, {
+				error: "Missing required parameter: agreementId",
+			});
 		}
 
 		// Validate agreementId format (basic check)
 		if (agreementId.length === 0 || agreementId.length > 128) {
-			return {
-				statusCode: 400,
-				body: JSON.stringify({
-					error: "Invalid agreementId format",
-				}),
-			};
+			return jsonResponse(400, {
+				error: "Invalid agreementId format",
+			});
 		}
 
 		const accessToken = await getAdobeAccessToken();
@@ -199,26 +203,22 @@ export const handler = async (
 			signedDate: agreement.signedDate,
 		};
 
-		return {
-			statusCode: 200,
-			headers: {
-				"Content-Type": "application/json",
-				"Access-Control-Allow-Origin": "*",
-			},
-			body: JSON.stringify(result),
-		};
+
+		console.info("Adobe agreement status fetched", {
+			agreementId,
+			status: result.status,
+		});
+
+		return jsonResponse(200, result);
 	} catch (error) {
 		console.error("adobeSignStatus error:", error);
 
 		const errorMessage =
 			error instanceof Error ? error.message : "Unknown error occurred";
 
-		return {
-			statusCode: 500,
-			body: JSON.stringify({
-				error: "Unable to fetch agreement status",
-				details: errorMessage,
-			}),
-		};
+		return jsonResponse(500, {
+			error: "Unable to fetch agreement status",
+			details: errorMessage,
+		});
 	}
 };
