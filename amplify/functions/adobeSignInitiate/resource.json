@@ -2,6 +2,7 @@
   "name": "adobeSignInitiate",
   "type": "lambda",
   "environment": {
+    "ADOBE_SIGN_ACCESS_TOKEN": "",
     "ADOBE_SIGN_CLIENT_ID": "",
     "ADOBE_SIGN_CLIENT_SECRET": "",
     "ADOBE_SIGN_REFRESH_TOKEN": "",

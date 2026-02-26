@@ -1,10 +1,19 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+type ApiGatewayEvent = {
+	queryStringParameters?: Record<string, string | undefined>;
+};
+
+type ApiGatewayResult = {
+	statusCode: number;
+	headers?: Record<string, string>;
+	body: string;
+};
 
 /**
  * Lambda function to fetch Adobe Sign agreement status
  * Called by client to poll signing progress
  * 
  * Environment variables required:
+ * - ADOBE_SIGN_ACCESS_TOKEN: Adobe access token (temporary fallback mode)
  * - ADOBE_SIGN_CLIENT_ID: Adobe OAuth application ID
  * - ADOBE_SIGN_CLIENT_SECRET: Adobe OAuth client secret
  * - ADOBE_SIGN_REFRESH_TOKEN: Adobe OAuth refresh token
@@ -20,6 +29,7 @@ interface AgreementStatusResponse {
 
 const ADOBE_SIGN_BASE_URI =
 	process.env.ADOBE_SIGN_BASE_URI || "https://api.na1.adobesign.com";
+const ADOBE_SIGN_ACCESS_TOKEN = process.env.ADOBE_SIGN_ACCESS_TOKEN;
 const ADOBE_SIGN_CLIENT_ID = process.env.ADOBE_SIGN_CLIENT_ID;
 const ADOBE_SIGN_CLIENT_SECRET = process.env.ADOBE_SIGN_CLIENT_SECRET;
 const ADOBE_SIGN_REFRESH_TOKEN = process.env.ADOBE_SIGN_REFRESH_TOKEN;
@@ -63,6 +73,14 @@ const getAccessTokenFromRefreshToken = async (): Promise<string> => {
 	return tokenResponse.access_token;
 };
 
+const getAdobeAccessToken = async (): Promise<string> => {
+	if (ADOBE_SIGN_ACCESS_TOKEN) {
+		return ADOBE_SIGN_ACCESS_TOKEN;
+	}
+
+	return getAccessTokenFromRefreshToken();
+};
+
 const callAdobeSignAPI = async <T>(
 	accessToken: string,
 	path: string,
@@ -89,13 +107,16 @@ const callAdobeSignAPI = async <T>(
 };
 
 export const handler = async (
-	event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+	event: ApiGatewayEvent
+): Promise<ApiGatewayResult> => {
 	console.log("adobeSignStatus handler invoked", {
 		queryStringParameters: event.queryStringParameters,
 	});
 
-	if (!ADOBE_SIGN_CLIENT_ID || !ADOBE_SIGN_CLIENT_SECRET || !ADOBE_SIGN_REFRESH_TOKEN) {
+	if (
+		!ADOBE_SIGN_ACCESS_TOKEN &&
+		(!ADOBE_SIGN_CLIENT_ID || !ADOBE_SIGN_CLIENT_SECRET || !ADOBE_SIGN_REFRESH_TOKEN)
+	) {
 		console.error("Missing OAuth environment variables for Adobe Sign");
 		return {
 			statusCode: 500,
@@ -128,7 +149,7 @@ export const handler = async (
 			};
 		}
 
-		const accessToken = await getAccessTokenFromRefreshToken();
+		const accessToken = await getAdobeAccessToken();
 
 		// Fetch agreement status from Adobe Sign
 		const agreement = await callAdobeSignAPI<{

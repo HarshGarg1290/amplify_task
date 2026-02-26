@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lambda:build:initiate": "tsc -p amplify/functions/adobeSignInitiate/tsconfig.json",
+    "lambda:build:status": "tsc -p amplify/functions/adobeSignStatus/tsconfig.json",
+    "lambda:build": "npm run lambda:build:initiate && npm run lambda:build:status"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.15.0",

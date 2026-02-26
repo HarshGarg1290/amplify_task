@@ -24,6 +24,41 @@ type StatusResponse = {
 	signedDate?: string;
 };
 
+const unwrapApiResponse = <T>(payload: unknown): T => {
+	if (
+		typeof payload === "object" &&
+		payload !== null &&
+		"body" in payload &&
+		typeof (payload as { body?: unknown }).body === "string"
+	) {
+		return JSON.parse((payload as { body: string }).body) as T;
+	}
+
+	return payload as T;
+};
+
+const getErrorMessage = (payload: unknown, fallback: string): string => {
+	if (
+		typeof payload === "object" &&
+		payload !== null &&
+		"error" in payload &&
+		typeof (payload as { error?: unknown }).error === "string"
+	) {
+		return (payload as { error: string }).error;
+	}
+
+	if (
+		typeof payload === "object" &&
+		payload !== null &&
+		"message" in payload &&
+		typeof (payload as { message?: unknown }).message === "string"
+	) {
+		return (payload as { message: string }).message;
+	}
+
+	return fallback;
+};
+
 /**
  * Get API Gateway endpoint from environment variable
  * Must be set in .env.local as NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT
@@ -61,14 +96,20 @@ export const initiateAdobeSignAgreement = async (
 		});
 
 		if (!response.ok) {
-			const errorBody = await response.json().catch(() => ({}));
-			const errorMsg = (errorBody as { error?: string }).error;
-			throw new Error(
-				errorMsg || `Failed to initiate Adobe Sign (${response.status})`
+			const rawErrorBody = await response.json().catch(() => ({}));
+			const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
+				rawErrorBody
 			);
+			throw new Error(getErrorMessage(errorBody, `Failed to initiate Adobe Sign (${response.status})`));
 		}
 
-		const data = (await response.json()) as InitiateResponse;
+		const rawPayload = (await response.json()) as unknown;
+		const data = unwrapApiResponse<InitiateResponse>(rawPayload);
+
+		if (!data.signingUrl) {
+			throw new Error("Agreement created but signing URL is missing in API response");
+		}
+
 		return data;
 	} catch (error) {
 		const message =
@@ -103,14 +144,15 @@ export const getAdobeSignAgreementStatus = async (
 		});
 
 		if (!response.ok) {
-			const errorBody = await response.json().catch(() => ({}));
-			const errorMsg = (errorBody as { error?: string }).error;
-			throw new Error(
-				errorMsg || `Failed to fetch status (${response.status})`
+			const rawErrorBody = await response.json().catch(() => ({}));
+			const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
+				rawErrorBody
 			);
+			throw new Error(getErrorMessage(errorBody, `Failed to fetch status (${response.status})`));
 		}
 
-		const data = (await response.json()) as StatusResponse;
+		const rawPayload = (await response.json()) as unknown;
+		const data = unwrapApiResponse<StatusResponse>(rawPayload);
 		return data;
 	} catch (error) {
 		const message =

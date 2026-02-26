@@ -59,9 +59,15 @@ You also need:
 
 ### 2) Configure Lambda environment variables
 
+You can run in either mode:
+
+- Preferred (production): `client_id + client_secret + refresh_token`
+- Temporary fallback: `access_token` only
+
 For `adobeSignInitiate`:
 
 ```bash
+ADOBE_SIGN_ACCESS_TOKEN=... # optional temporary fallback
 ADOBE_SIGN_CLIENT_ID=...
 ADOBE_SIGN_CLIENT_SECRET=...
 ADOBE_SIGN_REFRESH_TOKEN=...
@@ -72,11 +78,15 @@ ADOBE_SIGN_LIBRARY_DOCUMENT_ID=...
 For `adobeSignStatus`:
 
 ```bash
+ADOBE_SIGN_ACCESS_TOKEN=... # optional temporary fallback
 ADOBE_SIGN_CLIENT_ID=...
 ADOBE_SIGN_CLIENT_SECRET=...
 ADOBE_SIGN_REFRESH_TOKEN=...
 ADOBE_SIGN_BASE_URI=https://api.na1.adobesign.com
 ```
+
+If `ADOBE_SIGN_ACCESS_TOKEN` is provided, Lambda will use it directly.
+If it is not provided, Lambda will generate access tokens via refresh-token flow.
 
 ### 3) Create API Gateway routes
 
@@ -172,6 +182,32 @@ Create two Lambda functions in AWS Console:
 5. Add environment variables:
 	- For both: `ADOBE_SIGN_CLIENT_ID`, `ADOBE_SIGN_CLIENT_SECRET`, `ADOBE_SIGN_REFRESH_TOKEN`, `ADOBE_SIGN_BASE_URI`
 	- For initiate only: `ADOBE_SIGN_LIBRARY_DOCUMENT_ID`
+
+### 7.1) TypeScript Lambda workflow (recommended)
+
+Do not paste raw `.ts` code in Lambda console. Compile TypeScript to JavaScript first.
+
+From project root run:
+
+```bash
+npm run lambda:build
+```
+
+Compiled files will be generated at:
+
+- `amplify/functions/adobeSignInitiate/dist/index.js`
+- `amplify/functions/adobeSignStatus/dist/index.js`
+
+In AWS Lambda:
+
+1. Upload compiled JS (from `dist/index.js`) as your function code.
+2. Set handler to:
+
+```text
+index.handler
+```
+
+3. Runtime: Node.js 20.x.
 
 ### 8) Create API Gateway and get `NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT`
 
