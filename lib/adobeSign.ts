@@ -20,6 +20,11 @@ type InitiateResponse = {
 type StatusResponse = {
 	agreementId: string;
 	status: string;
+	agreementName?: string;
+	createdDate?: string;
+	senderEmail?: string;
+	senderName?: string;
+	recipients?: Array<{ email: string; name?: string }>;
 	displayDate?: string;
 	signedDate?: string;
 };

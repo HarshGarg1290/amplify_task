@@ -96,9 +96,22 @@ const handler = async (event) => {
         const accessToken = await getAdobeAccessToken();
         // Fetch agreement status from Adobe Sign
         const agreement = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}`, { method: "GET" });
+        const recipients = agreement.participantSetsInfo
+            ?.flatMap((participantSet) => (participantSet.memberInfos || [])
+            .filter((member) => Boolean(member.email))
+            .map((member) => ({
+            email: member.email,
+            name: member.name,
+        })))
+            .filter((recipient, index, allRecipients) => allRecipients.findIndex((entry) => entry.email === recipient.email) === index) || [];
         const result = {
             agreementId: agreement.id,
             status: agreement.status,
+            agreementName: agreement.name,
+            createdDate: agreement.createdDate,
+            senderEmail: agreement.senderEmail || agreement.creatorEmail,
+            senderName: agreement.senderName,
+            recipients,
             displayDate: agreement.displayDate,
             signedDate: agreement.signedDate,
         };

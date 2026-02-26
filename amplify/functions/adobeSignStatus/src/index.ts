@@ -23,6 +23,11 @@ type ApiGatewayResult = {
 interface AgreementStatusResponse {
 	agreementId: string;
 	status: string;
+	agreementName?: string;
+	createdDate?: string;
+	senderEmail?: string;
+	senderName?: string;
+	recipients?: Array<{ email: string; name?: string }>;
 	displayDate?: string;
 	signedDate?: string;
 }
@@ -155,13 +160,41 @@ export const handler = async (
 		const agreement = await callAdobeSignAPI<{
 			id: string;
 			status: string;
+			name?: string;
+			createdDate?: string;
+			senderEmail?: string;
+			senderName?: string;
+			creatorEmail?: string;
+			participantSetsInfo?: Array<{
+				memberInfos?: Array<{ email?: string; name?: string }>;
+			}>;
 			displayDate?: string;
 			signedDate?: string;
 		}>(accessToken, `/agreements/${agreementId}`, { method: "GET" });
 
+		const recipients =
+			agreement.participantSetsInfo
+				?.flatMap((participantSet) =>
+					(participantSet.memberInfos || [])
+						.filter((member) => Boolean(member.email))
+						.map((member) => ({
+							email: member.email as string,
+							name: member.name,
+						}))
+				)
+				.filter(
+					(recipient, index, allRecipients) =>
+						allRecipients.findIndex((entry) => entry.email === recipient.email) === index
+				) || [];
+
 		const result: AgreementStatusResponse = {
 			agreementId: agreement.id,
 			status: agreement.status,
+			agreementName: agreement.name,
+			createdDate: agreement.createdDate,
+			senderEmail: agreement.senderEmail || agreement.creatorEmail,
+			senderName: agreement.senderName,
+			recipients,
 			displayDate: agreement.displayDate,
 			signedDate: agreement.signedDate,
 		};
