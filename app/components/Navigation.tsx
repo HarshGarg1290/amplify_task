@@ -32,7 +32,7 @@ export default function Navigation({ activePage }: NavigationProps) {
 	const handleLogout = () => {
 		setIsDropdownOpen(false);
 		signOut();
-		router.push("/login");
+		router.replace("/login");
 	};
 
 	const displayIdentity = user?.name || user?.email || "";

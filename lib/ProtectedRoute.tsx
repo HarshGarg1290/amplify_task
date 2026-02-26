@@ -33,7 +33,13 @@ export const ProtectedRoute = ({ children }: Props) => {
 		);
 	}
 
-	if (!isAuthenticated) return null;
+	if (!isAuthenticated) {
+		return (
+			<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center">
+				<LoadingSpinner size="lg" label="Redirecting to login..." />
+			</div>
+		);
+	}
 
 	return <>{children}</>;
 };
