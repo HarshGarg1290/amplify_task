@@ -114,7 +114,7 @@ const createAgreement = async (
 	quoteId: string,
 	signerEmail: string,
 	signerName?: string
-): Promise<{ agreementId: string; signingUrl: string; status: string }> => {
+): Promise<{ agreementId: string; status: string }> => {
 	// Step 1: Create agreement from library document
 	const createResponse = await callAdobeSignAPI<{ id: string }>(
 		accessToken,
@@ -141,27 +141,8 @@ const createAgreement = async (
 	const agreementId = createResponse.id;
 	console.log(`Created agreement: ${agreementId}`);
 
-	// Step 2: Get signing URLs
-	const signingResponse = await callAdobeSignAPI<{
-		signingUrlSetInfos?: Array<{
-			signingUrls?: Array<{ esignUrl?: string }>;
-		}>;
-	}>(accessToken, `/agreements/${agreementId}/signingUrls`, {
-		method: "GET",
-	});
-
-	const signingUrl =
-		signingResponse.signingUrlSetInfos?.[0]?.signingUrls?.[0]?.esignUrl || "";
-
-	if (!signingUrl) {
-		throw new Error("Unable to retrieve Adobe Sign signing URL");
-	}
-
-	console.log(`Generated signing URL for agreement: ${agreementId}`);
-
 	return {
 		agreementId,
-		signingUrl,
 		status: "IN_PROCESS",
 	};
 };
