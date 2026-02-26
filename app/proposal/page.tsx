@@ -6,12 +6,12 @@ import { CiCalendar } from "react-icons/ci";
 import { TfiArrowTopRight } from "react-icons/tfi";
 import { IoIosArrowDown } from "react-icons/io";
 import { CiChat1 } from "react-icons/ci";
-import { TiTick } from "react-icons/ti";
 import { ImArrowDown } from "react-icons/im";
 import { GoChecklist } from "react-icons/go";
 import { HiOutlineWrenchScrewdriver } from "react-icons/hi2";
 import { IoIosLink } from "react-icons/io";
 import { GiGraduateCap } from "react-icons/gi";
+import AcceptAndSignButton from "../components/AcceptAndSignButton";
 const lineItems = [
 	{
 		item: "Pathology Scanner SG300",
@@ -441,9 +441,10 @@ export default function ProposalPage() {
 								<button className="inline-flex items-center gap-1 px-4 py-2 rounded-lg border border-blue-400 text-blue-100 text-sm font-semibold">
 									<IoIosArrowDown />Download PDF
 								</button>
-								<button className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-semibold">
-									<TiTick /> Accept &amp; Sign Quote
-								</button>
+								<AcceptAndSignButton
+									quoteId="UTM-2026-0042"
+									className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-teal-500 text-white text-sm font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
+								/>
 							</div>
 						</div>
 					</div>

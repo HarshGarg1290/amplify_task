@@ -1,0 +1,14 @@
+{
+  "name": "adobeSignStatus",
+  "type": "lambda",
+  "environment": {
+    "ADOBE_SIGN_CLIENT_ID": "",
+    "ADOBE_SIGN_CLIENT_SECRET": "",
+    "ADOBE_SIGN_REFRESH_TOKEN": "",
+    "ADOBE_SIGN_BASE_URI": "https://api.na1.adobesign.com"
+  },
+  "runtime": "nodejs18.x",
+  "handler": "src/index.handler",
+  "timeout": 15,
+  "memory": 256
+}

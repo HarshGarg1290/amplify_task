@@ -25,7 +25,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-h1,
-h2{
+
+.proposal-heading h1,
+.proposal-heading h2 {
   font-family: var(--font-heading), serif;
 }
