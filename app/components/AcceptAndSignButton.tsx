@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TiTick } from "react-icons/ti";
 import { useAuth } from "@/lib/authContext";
 import { initiateAdobeSignAgreement } from "@/lib/adobeSign";
+import { useRouter } from "next/navigation";
 
 type Props = {
 	quoteId: string;
@@ -12,6 +13,7 @@ type Props = {
 
 export default function AcceptAndSignButton({ quoteId, className }: Props) {
 	const { user } = useAuth();
+	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -35,12 +37,13 @@ export default function AcceptAndSignButton({ quoteId, className }: Props) {
 				signerName: user.name ?? user.username ?? user.email,
 			});
 
-			// Redirect user to Adobe Sign signing URL
-			if (result.signingUrl) {
-				window.location.assign(result.signingUrl);
-			} else {
-				throw new Error("No signing URL returned from Adobe Sign");
+			if (!result.agreementId) {
+				throw new Error("Agreement created but agreement id is missing");
 			}
+
+			router.push(
+				`/proposal/status?agreementId=${encodeURIComponent(result.agreementId)}`
+			);
 		} catch (err) {
 			const errorMessage =
 				err instanceof Error

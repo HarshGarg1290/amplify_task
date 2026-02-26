@@ -110,9 +110,9 @@ NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT=https://<api-id>.execute-api.<region>.amazon
 1. User clicks Accept & Sign.
 2. Frontend calls `POST /api/adobe-sign/initiate`.
 3. Lambda exchanges refresh token for a short-lived Adobe access token.
-4. Lambda creates Adobe agreement and returns `signingUrl`.
-5. Frontend redirects user to Adobe Sign hosted page.
-6. Frontend can call `GET /api/adobe-sign/status?agreementId=...` to track status.
+4. Lambda creates Adobe agreement and sends review/sign email to signer.
+5. Frontend redirects user to internal status page using `agreementId`.
+6. Status page calls `GET /api/adobe-sign/status?agreementId=...` to track status.
 
 ### Notes
 

@@ -13,7 +13,7 @@ type InitiatePayload = {
 
 type InitiateResponse = {
 	agreementId: string;
-	signingUrl: string;
+	signingUrl?: string;
 	status: string;
 };
 
@@ -75,8 +75,8 @@ const getApiEndpoint = (): string => {
 
 /**
  * Initiate an Adobe Sign agreement via Lambda
- * - Creates agreement from template
- * - Returns signing URL for user to complete signature
+ * - Creates agreement from template and sends email to signer
+ * - Returns agreement id for status tracking
  * 
  * Calls: POST /api/adobe-sign/initiate
  */
@@ -105,10 +105,6 @@ export const initiateAdobeSignAgreement = async (
 
 		const rawPayload = (await response.json()) as unknown;
 		const data = unwrapApiResponse<InitiateResponse>(rawPayload);
-
-		if (!data.signingUrl) {
-			throw new Error("Agreement created but signing URL is missing in API response");
-		}
 
 		return data;
 	} catch (error) {
