@@ -18,7 +18,13 @@ function AuthCallbackContent() {
 				const errorDescription = searchParams.get("error_description");
 
 				if (error) {
-					router.push("/login?error=" + error);
+					router.push(
+						`/login?error=${encodeURIComponent(error)}${
+							errorDescription
+								? `&error_description=${encodeURIComponent(errorDescription)}`
+								: ""
+						}`,
+					);
 					return;
 				}
 
@@ -36,7 +42,11 @@ function AuthCallbackContent() {
 
 				router.push("/home");
 			} catch (error) {
-				router.push("/login?error=auth_failed");
+				const message =
+					error instanceof Error ? error.message : "Token exchange failed";
+				router.push(
+					`/login?error=auth_failed&error_description=${encodeURIComponent(message)}`,
+				);
 			}
 		};
 

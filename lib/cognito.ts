@@ -3,6 +3,8 @@ import {
 	CognitoUserSession,
 } from "amazon-cognito-identity-js";
 
+const PKCE_VERIFIER_STORAGE_KEY = "cognito_pkce_verifier";
+
 const poolData = {
 	UserPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || "",
 	ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || "",
@@ -98,14 +100,45 @@ export const getCurrentUser = (): Promise<AuthUser | null> => {
 	});
 };
 
-export const getHostedUILoginUrl = (): string => {
+export const getHostedUILoginUrl = async (): Promise<string> => {
+	const generateRandomString = (length: number): string => {
+		const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+		const randomValues = new Uint8Array(length);
+		crypto.getRandomValues(randomValues);
+		let result = "";
+		for (let index = 0; index < length; index += 1) {
+			result += chars[randomValues[index] % chars.length];
+		}
+		return result;
+	};
+
+	const base64UrlEncode = (arrayBuffer: ArrayBuffer): string => {
+		const bytes = new Uint8Array(arrayBuffer);
+		let binary = "";
+		for (let index = 0; index < bytes.length; index += 1) {
+			binary += String.fromCharCode(bytes[index]);
+		}
+		return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+	};
+
+	const generateCodeChallenge = async (verifier: string): Promise<string> => {
+		const data = new TextEncoder().encode(verifier);
+		const digest = await crypto.subtle.digest("SHA-256", data);
+		return base64UrlEncode(digest);
+	};
+
 	const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
 	const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
 	const redirectUri = process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI;
 	const scopes =
-		process.env.NEXT_PUBLIC_COGNITO_SCOPES || "openid profile email";
+		(process.env.NEXT_PUBLIC_COGNITO_SCOPES || "openid profile email").replace(/"/g, "");
 	const identityProvider =
 		process.env.NEXT_PUBLIC_IDENTITY_PROVIDER || "AzureAD";
+
+	const verifier = generateRandomString(96);
+	sessionStorage.setItem(PKCE_VERIFIER_STORAGE_KEY, verifier);
+
+	const challenge = await generateCodeChallenge(verifier);
 
 	const params = new URLSearchParams({
 		client_id: clientId || "",
@@ -113,6 +146,8 @@ export const getHostedUILoginUrl = (): string => {
 		scope: scopes,
 		redirect_uri: redirectUri || "",
 		identity_provider: identityProvider,
+		code_challenge_method: "S256",
+		code_challenge: challenge,
 	});
 
 	return `https://${domain}.auth.${process.env.NEXT_PUBLIC_COGNITO_REGION}.amazoncognito.com/oauth2/authorize?${params.toString()}`;
@@ -122,6 +157,7 @@ export const exchangeCodeForToken = async (code: string): Promise<AuthUser> => {
 	const domain = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
 	const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
 	const redirectUri = process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI;
+	const codeVerifier = sessionStorage.getItem(PKCE_VERIFIER_STORAGE_KEY) || "";
 
 	const response = await fetch(
 		`https://${domain}.auth.${process.env.NEXT_PUBLIC_COGNITO_REGION}.amazoncognito.com/oauth2/token`,
@@ -134,6 +170,7 @@ export const exchangeCodeForToken = async (code: string): Promise<AuthUser> => {
 				grant_type: "authorization_code",
 				client_id: clientId || "",
 				code: code,
+				code_verifier: codeVerifier,
 				redirect_uri: redirectUri || "",
 			}).toString(),
 		},
@@ -142,8 +179,14 @@ export const exchangeCodeForToken = async (code: string): Promise<AuthUser> => {
 	const data = await response.json();
 
 	if (!response.ok) {
-		throw new Error(data.error || "Failed to exchange code for token");
+		const errorText =
+			(data.error_description as string | undefined) ||
+			(data.error as string | undefined) ||
+			"Failed to exchange code for token";
+		throw new Error(errorText);
 	}
+
+	sessionStorage.removeItem(PKCE_VERIFIER_STORAGE_KEY);
 
 	const parts = data.id_token.split(".");
 	const decoded = JSON.parse(atob(parts[1]));

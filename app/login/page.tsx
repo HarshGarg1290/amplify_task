@@ -14,8 +14,8 @@ function LoginPageContent() {
 		  }`
 		: "";
 
-	const handleMicrosoftSSO = () => {
-		const loginUrl = getHostedUILoginUrl();
+	const handleMicrosoftSSO = async () => {
+		const loginUrl = await getHostedUILoginUrl();
 		window.location.href = loginUrl;
 	};
 

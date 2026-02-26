@@ -131,8 +131,8 @@ NEXT_PUBLIC_COGNITO_REGION=ap-south-1
 NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-south-1_caRoAWZDd
 NEXT_PUBLIC_COGNITO_CLIENT_ID=462rt760703rh9v55ckbc0plfk
 NEXT_PUBLIC_COGNITO_DOMAIN=ap-south-1caroawzdd
-NEXT_PUBLIC_COGNITO_REDIRECT_URI=https://<your-amplify-domain>/auth/callback
-NEXT_PUBLIC_COGNITO_LOGOUT_URI=https://<your-amplify-domain>/login
+NEXT_PUBLIC_COGNITO_REDIRECT_URI=https://main.d1flytdzrouwef.amplifyapp.com/auth/callback
+NEXT_PUBLIC_COGNITO_LOGOUT_URI=https://main.d1flytdzrouwef.amplifyapp.com/login
 NEXT_PUBLIC_COGNITO_SCOPES=openid profile email
 NEXT_PUBLIC_IDENTITY_PROVIDER=AzureAD
 ```
@@ -149,10 +149,52 @@ NEXT_PUBLIC_IDENTITY_PROVIDER=AzureAD
 - If your callback is app-side, use:
 
 ```text
-https://<your-amplify-domain>/adobe-sign/callback
+https://main.d1flytdzrouwef.amplifyapp.com/adobe-sign/callback
 ```
 
 Redirect URI in Adobe settings must exactly match the URI used in OAuth authorize/token calls.
+
+### 7) Add Lambda functions in AWS (if not created yet)
+
+Use the code already in this repo:
+
+- `amplify/functions/adobeSignInitiate/src/index.ts`
+- `amplify/functions/adobeSignStatus/src/index.ts`
+
+Create two Lambda functions in AWS Console:
+
+1. Lambda → Create function → Author from scratch.
+2. Function names:
+	- `adobeSignInitiate`
+	- `adobeSignStatus`
+3. Runtime: Node.js 20.x (or 18.x).
+4. Paste code from the files above into each function.
+5. Add environment variables:
+	- For both: `ADOBE_SIGN_CLIENT_ID`, `ADOBE_SIGN_CLIENT_SECRET`, `ADOBE_SIGN_REFRESH_TOKEN`, `ADOBE_SIGN_BASE_URI`
+	- For initiate only: `ADOBE_SIGN_LIBRARY_DOCUMENT_ID`
+
+### 8) Create API Gateway and get `NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT`
+
+1. API Gateway → Create API → HTTP API.
+2. Add integrations:
+	- `POST /api/adobe-sign/initiate` → Lambda `adobeSignInitiate`
+	- `GET /api/adobe-sign/status` → Lambda `adobeSignStatus`
+3. Enable CORS for your frontend origin:
+	- `https://main.d1flytdzrouwef.amplifyapp.com`
+4. Deploy to stage (for example `prod`).
+5. Copy **Invoke URL** from API Gateway stage.
+
+Your frontend env var value becomes:
+
+```bash
+NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT=<invoke-url>
+```
+
+Example:
+
+```bash
+NEXT_PUBLIC_ADOBE_SIGN_API_ENDPOINT=https://abc123.execute-api.ap-south-1.amazonaws.com/prod
+```
 
 ### 6) Smoke test
 
