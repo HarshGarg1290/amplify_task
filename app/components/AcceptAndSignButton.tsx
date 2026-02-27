@@ -72,7 +72,7 @@ export default function AcceptAndSignButton({ quoteId, className }: Props) {
 				{isSubmitting ? <LoadingSpinner size="sm" /> : <TiTick />}
 				{isSubmitting
 					? "Preparing Adobe Sign..."
-					: "Accept & Sign Quote"}
+					: "Send Agreement for Signature"}
 			</button>
 			{error && (
 				<p className="text-xs text-red-200 max-w-xs">{error}</p>
