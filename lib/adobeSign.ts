@@ -9,6 +9,8 @@ type InitiatePayload = {
 	quoteId: string;
 	signerEmail: string;
 	signerName?: string;
+	additionalSignerEmails?: string[];
+	ccEmails?: string[];
 };
 
 type InitiateResponse = {

@@ -20,23 +20,14 @@ const jsonResponse = (statusCode: number, payload: unknown): ApiGatewayResult =>
 	body: JSON.stringify(payload),
 });
 
-/**
- * Lambda function to initiate an Adobe Sign agreement
- * Triggered by API Gateway from the Next.js client
- * 
- * Environment variables required:
- * - ADOBE_SIGN_ACCESS_TOKEN: Adobe access token (temporary fallback mode)
- * - ADOBE_SIGN_CLIENT_ID: Adobe OAuth application ID
- * - ADOBE_SIGN_CLIENT_SECRET: Adobe OAuth client secret
- * - ADOBE_SIGN_REFRESH_TOKEN: Adobe OAuth refresh token
- * - ADOBE_SIGN_BASE_URI: Adobe Sign API base (default: https://api.na1.adobesign.com)
- * - ADOBE_SIGN_LIBRARY_DOCUMENT_ID: Pre-created template document ID
- */
+
 
 interface InitiatePayload {
 	quoteId: string;
 	signerEmail: string;
 	signerName?: string;
+	additionalSignerEmails?: string[];
+	ccEmails?: string[];
 }
 
 const ADOBE_SIGN_BASE_URI =
@@ -47,6 +38,31 @@ const ADOBE_SIGN_CLIENT_SECRET = process.env.ADOBE_SIGN_CLIENT_SECRET;
 const ADOBE_SIGN_REFRESH_TOKEN = process.env.ADOBE_SIGN_REFRESH_TOKEN;
 const ADOBE_SIGN_LIBRARY_DOCUMENT_ID =
 	process.env.ADOBE_SIGN_LIBRARY_DOCUMENT_ID;
+const ADOBE_SIGN_DEFAULT_CC_EMAILS = process.env.ADOBE_SIGN_DEFAULT_CC_EMAILS;
+const LEAD_SIGNER_EMAIL = "Rajkumar.Purushothman@philips.com";
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const parseEmailList = (raw: string | undefined): string[] =>
+	(raw || "")
+		.split(",")
+		.map((email) => email.trim())
+		.filter(Boolean);
+
+const toUniqueEmails = (emails: string[]): string[] => {
+	const seen = new Set<string>();
+	const deduped: string[] = [];
+
+	for (const email of emails) {
+		const key = email.toLowerCase();
+		if (!seen.has(key)) {
+			seen.add(key);
+			deduped.push(email);
+		}
+	}
+
+	return deduped;
+};
 
 const getAdobeSignHeaders = (accessToken: string) => ({
 	Authorization: `Bearer ${accessToken}`,
@@ -126,9 +142,43 @@ const createAgreement = async (
 	accessToken: string,
 	quoteId: string,
 	signerEmail: string,
-	signerName?: string
+	signerName?: string,
+	additionalSignerEmails: string[] = [],
+	ccEmails: string[] = []
 ): Promise<{ agreementId: string; status: string }> => {
-	// Step 1: Create agreement from library document
+	const participantSetsInfo: Array<{
+		memberInfos: Array<{ email: string }>;
+		role: "SIGNER" | "CC";
+		order: number;
+		name?: string;
+	}> = [
+		{
+			memberInfos: [{ email: signerEmail }],
+			role: "SIGNER",
+			order: 1,
+			name: signerName || signerEmail,
+		},
+	];
+
+	if (additionalSignerEmails.length > 0) {
+		additionalSignerEmails.forEach((email, index) => {
+			participantSetsInfo.push({
+				memberInfos: [{ email }],
+				role: "SIGNER",
+				order: 2 + index,
+				name: email,
+			});
+		});
+	}
+
+	if (ccEmails.length > 0) {
+		participantSetsInfo.push({
+			memberInfos: ccEmails.map((email) => ({ email })),
+			role: "CC",
+			order: 2 + additionalSignerEmails.length,
+		});
+	}
+
 	const createResponse = await callAdobeSignAPI<{ id: string }>(
 		accessToken,
 		"/agreements",
@@ -137,14 +187,7 @@ const createAgreement = async (
 			body: JSON.stringify({
 				name: `Quote ${quoteId} Acceptance`,
 				fileInfos: [{ libraryDocumentId: ADOBE_SIGN_LIBRARY_DOCUMENT_ID }],
-				participantSetsInfo: [
-					{
-						memberInfos: [{ email: signerEmail }],
-						role: "SIGNER",
-						order: 1,
-						name: signerName || signerEmail,
-					},
-				],
+				participantSetsInfo,
 				signatureType: "ESIGN",
 				state: "IN_PROCESS",
 			}),
@@ -191,15 +234,63 @@ export const handler = async (
 			});
 		}
 
-		// Validate email format
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(payload.signerEmail)) {
 			return jsonResponse(400, { error: "Invalid email format" });
+		}
+
+		const payloadCcEmails = Array.isArray(payload.ccEmails)
+			? payload.ccEmails.map((email) => String(email).trim()).filter(Boolean)
+			: [];
+		const payloadAdditionalSignerEmails = Array.isArray(
+			payload.additionalSignerEmails
+		)
+			? payload.additionalSignerEmails
+					.map((email) => String(email).trim())
+					.filter(Boolean)
+			: [];
+		const envCcEmails = parseEmailList(ADOBE_SIGN_DEFAULT_CC_EMAILS);
+
+		const combinedAdditionalSignerEmails = toUniqueEmails([
+			LEAD_SIGNER_EMAIL,
+			...payloadAdditionalSignerEmails,
+		]).filter(
+			(email) => email.toLowerCase() !== payload.signerEmail.toLowerCase()
+		);
+
+		const sanitizedCcEmails = toUniqueEmails([
+			...envCcEmails,
+			...payloadCcEmails,
+		]).filter(
+			(email) =>
+				email.toLowerCase() !== payload.signerEmail.toLowerCase() &&
+				!combinedAdditionalSignerEmails.some(
+					(signerEmail) => signerEmail.toLowerCase() === email.toLowerCase()
+				)
+		);
+
+		const invalidAdditionalSignerEmail = combinedAdditionalSignerEmails.find(
+			(email) => !emailRegex.test(email)
+		);
+		if (invalidAdditionalSignerEmail) {
+			return jsonResponse(400, {
+				error: `Invalid additionalSignerEmails entry: ${invalidAdditionalSignerEmail}`,
+			});
+		}
+
+		const invalidCcEmail = sanitizedCcEmails.find(
+			(email) => !emailRegex.test(email)
+		);
+		if (invalidCcEmail) {
+			return jsonResponse(400, {
+				error: `Invalid ccEmails entry: ${invalidCcEmail}`,
+			});
 		}
 
 		console.info("Initiating Adobe agreement", {
 			quoteId: payload.quoteId,
 			signerDomain: payload.signerEmail.split("@")[1] || "unknown",
+			additionalSigners: combinedAdditionalSignerEmails.length,
+			ccRecipients: sanitizedCcEmails.length,
 		});
 
 		const accessToken = await getAdobeAccessToken();
@@ -209,7 +300,9 @@ export const handler = async (
 			accessToken,
 			payload.quoteId,
 			payload.signerEmail,
-			payload.signerName
+			payload.signerName,
+			combinedAdditionalSignerEmails,
+			sanitizedCcEmails
 		);
 
 		return jsonResponse(200, result);

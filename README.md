@@ -99,6 +99,7 @@ npm run lambda:build
 
 - `ADOBE_SIGN_BASE_URI`
 - `ADOBE_SIGN_LIBRARY_DOCUMENT_ID`
+- Optional default recipients: `ADOBE_SIGN_DEFAULT_CC_EMAILS` (comma-separated)
 - Preferred auth: `ADOBE_SIGN_CLIENT_ID`, `ADOBE_SIGN_CLIENT_SECRET`, `ADOBE_SIGN_REFRESH_TOKEN`
 - Temporary fallback: `ADOBE_SIGN_ACCESS_TOKEN`
 
@@ -160,9 +161,20 @@ Request body:
 {
 	"quoteId": "UTM-2026-0042",
 	"signerEmail": "user@company.com",
-	"signerName": "User Name"
+	"signerName": "User Name",
+	"additionalSignerEmails": ["lead@company.com"],
+	"ccEmails": ["ops@company.com"]
 }
 ```
+
+Notes:
+
+- `additionalSignerEmails` is optional and creates additional required `SIGNER` participants.
+- `ccEmails` is optional.
+- If an email exists in both `additionalSignerEmails` and `ccEmails`, it is treated as a signer.
+- Lambda currently hardcodes one default lead signer in `amplify/functions/adobeSignInitiate/src/index.ts` (`HARDCODED_LEAD_SIGNER_EMAIL`).
+- If `ADOBE_SIGN_DEFAULT_CC_EMAILS` is set in Lambda, those recipients are always included.
+- Duplicate emails are removed automatically.
 
 Response:
 
