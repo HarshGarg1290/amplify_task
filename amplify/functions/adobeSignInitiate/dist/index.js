@@ -17,7 +17,7 @@ const ADOBE_SIGN_CLIENT_SECRET = process.env.ADOBE_SIGN_CLIENT_SECRET;
 const ADOBE_SIGN_REFRESH_TOKEN = process.env.ADOBE_SIGN_REFRESH_TOKEN;
 const ADOBE_SIGN_LIBRARY_DOCUMENT_ID = process.env.ADOBE_SIGN_LIBRARY_DOCUMENT_ID;
 const ADOBE_SIGN_DEFAULT_CC_EMAILS = process.env.ADOBE_SIGN_DEFAULT_CC_EMAILS;
-const HARDCODED_LEAD_SIGNER_EMAIL = "Rajkumar.Purushothman@philips.com";
+const LEAD_SIGNER_EMAIL = "Rajkumar.Purushothman@philips.com";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const parseEmailList = (raw) => (raw || "")
     .split(",")
@@ -169,7 +169,7 @@ const handler = async (event) => {
             : [];
         const envCcEmails = parseEmailList(ADOBE_SIGN_DEFAULT_CC_EMAILS);
         const combinedAdditionalSignerEmails = toUniqueEmails([
-            HARDCODED_LEAD_SIGNER_EMAIL,
+            LEAD_SIGNER_EMAIL,
             ...payloadAdditionalSignerEmails,
         ]).filter((email) => email.toLowerCase() !== payload.signerEmail.toLowerCase());
         const sanitizedCcEmails = toUniqueEmails([

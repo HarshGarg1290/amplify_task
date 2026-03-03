@@ -26,7 +26,13 @@ type StatusResponse = {
 	createdDate?: string;
 	senderEmail?: string;
 	senderName?: string;
-	recipients?: Array<{ email: string; name?: string }>;
+	recipients?: Array<{
+		email: string;
+		name?: string;
+		status?: string;
+		role?: string;
+		order?: number;
+	}>;
 	displayDate?: string;
 	signedDate?: string;
 };
@@ -166,4 +172,43 @@ export const getAdobeSignAgreementStatus = async (
 		console.error("Failed to fetch Adobe Sign status:", message);
 		throw error;
 	}
+};
+
+export const downloadAdobeSignAgreementDocument = async (
+	agreementId: string
+): Promise<void> => {
+	const apiEndpoint = getApiEndpoint();
+	const url = new URL(`${apiEndpoint}/api/adobe-sign/status`);
+	url.searchParams.set("agreementId", agreementId);
+	url.searchParams.set("download", "true");
+
+	const response = await fetch(url.toString(), {
+		method: "GET",
+	});
+
+	if (!response.ok) {
+		const rawErrorBody = await response.json().catch(() => ({}));
+		const errorBody = unwrapApiResponse<{ error?: string; message?: string }>(
+			rawErrorBody
+		);
+		throw new Error(
+			getErrorMessage(errorBody, `Failed to download document (${response.status})`)
+		);
+	}
+
+	const blob = await response.blob();
+	const contentDisposition = response.headers.get("content-disposition") || "";
+	const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+	const decodedName = filenameMatch?.[1]
+		? decodeURIComponent(filenameMatch[1].replace(/\"/g, "").trim())
+		: `agreement-${agreementId}.pdf`;
+
+	const downloadUrl = window.URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = downloadUrl;
+	anchor.download = decodedName;
+	document.body.appendChild(anchor);
+	anchor.click();
+	anchor.remove();
+	window.URL.revokeObjectURL(downloadUrl);
 };

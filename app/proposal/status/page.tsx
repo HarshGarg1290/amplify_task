@@ -4,7 +4,10 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navigation from "@/app/components/Navigation";
-import { getAdobeSignAgreementStatus } from "@/lib/adobeSign";
+import {
+	downloadAdobeSignAgreementDocument,
+	getAdobeSignAgreementStatus,
+} from "@/lib/adobeSign";
 import LoadingSpinner from "@/app/components/LoadingSpinner";
 import { ProtectedRoute } from "@/lib/ProtectedRoute";
 
@@ -15,7 +18,13 @@ type AgreementStatus = {
 	createdDate?: string;
 	senderEmail?: string;
 	senderName?: string;
-	recipients?: Array<{ email: string; name?: string }>;
+	recipients?: Array<{
+		email: string;
+		name?: string;
+		status?: string;
+		role?: string;
+		order?: number;
+	}>;
 	displayDate?: string;
 	signedDate?: string;
 };
@@ -25,6 +34,21 @@ const STATUS_COPY: Record<string, string> = {
 	SIGNED: "Signed successfully.",
 	CANCELLED: "Agreement was cancelled.",
 	EXPIRED: "Agreement has expired.",
+};
+
+const RECIPIENT_STATUS_COPY: Record<string, string> = {
+	SIGNED: "Signed",
+	COMPLETED: "Signed",
+	WAITING_FOR_MY_DELEGATE: "Waiting for delegate",
+	WAITING_FOR_AUTHORING: "Waiting",
+	WAITING_FOR_PREFILL: "Waiting",
+	WAITING_FOR_OTHERS: "Waiting",
+	OUT_FOR_SIGNATURE: "Pending",
+	NOT_YET_VISIBLE: "Pending",
+	ACTIVE: "Pending",
+	CANCELLED: "Cancelled",
+	REJECTED: "Rejected",
+	EXPIRED: "Expired",
 };
 
 const formatDateTime = (value?: string) => {
@@ -40,6 +64,7 @@ function ProposalStatusContent() {
 	const [statusData, setStatusData] = useState<AgreementStatus | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [isDownloading, setIsDownloading] = useState(false);
 	const previousStatusRef = useRef<string | null>(null);
 
 	useEffect(() => {
@@ -96,6 +121,46 @@ function ProposalStatusContent() {
 		STATUS_COPY[statusLabel] || "Status updated. Please review in Adobe account.";
 	const recipients = statusData?.recipients || [];
 
+	const handleDownload = async () => {
+		if (!agreementId) {
+			setError("Missing agreementId in URL.");
+			return;
+		}
+
+		setIsDownloading(true);
+		try {
+			await downloadAdobeSignAgreementDocument(agreementId);
+		} catch (downloadError) {
+			setError(
+				downloadError instanceof Error
+					? downloadError.message
+					: "Failed to download agreement document"
+			);
+		} finally {
+			setIsDownloading(false);
+		}
+	};
+
+	const getRecipientStatusText = (status?: string): string => {
+		if (!status) return "Pending";
+		const normalized = status.toUpperCase();
+		return RECIPIENT_STATUS_COPY[normalized] || normalized;
+	};
+
+	const getRecipientStatusClassName = (status?: string): string => {
+		const normalized = (status || "").toUpperCase();
+
+		if (normalized === "SIGNED" || normalized === "COMPLETED") {
+			return "bg-emerald-100 text-emerald-700";
+		}
+
+		if (normalized === "CANCELLED" || normalized === "REJECTED" || normalized === "EXPIRED") {
+			return "bg-red-100 text-red-700";
+		}
+
+		return "bg-amber-100 text-amber-700";
+	};
+
 	return (
 		<ProtectedRoute>
 			<div className="min-h-screen bg-linear-to-br from-blue-500 via-blue-600 to-blue-700">
@@ -134,11 +199,18 @@ function ProposalStatusContent() {
 						<div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
 						<p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Recipients</p>
 						{recipients.length > 0 ? (
-							<ul className="space-y-1 text-gray-900">
+							<ul className="space-y-2 text-gray-900">
 								{recipients.map((recipient) => (
-									<li key={recipient.email}>
-										{recipient.name ? `${recipient.name} ` : ""}
-										&lt;{recipient.email}&gt;
+									<li key={recipient.email} className="flex items-center justify-between gap-3">
+										<span>
+											{recipient.name ? `${recipient.name} ` : ""}
+											&lt;{recipient.email}&gt;
+										</span>
+										<span
+											className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRecipientStatusClassName(recipient.status)}`}
+										>
+											{getRecipientStatusText(recipient.status)}
+										</span>
 									</li>
 								))}
 							</ul>
@@ -175,6 +247,14 @@ function ProposalStatusContent() {
 						{error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
 						<div className="mt-6 flex gap-3">
+							<button
+								type="button"
+								onClick={handleDownload}
+								disabled={isDownloading || !agreementId}
+								className="px-4 py-2 rounded-lg border border-blue-200 text-blue-700 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+							>
+								{isDownloading ? "Downloading..." : "Download Proposal"}
+							</button>
 							<Link
 								href="/proposal"
 								className="px-4 py-2 rounded-lg border border-blue-200 text-blue-700 text-sm font-medium"

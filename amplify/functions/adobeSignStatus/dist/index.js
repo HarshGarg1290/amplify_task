@@ -4,6 +4,7 @@ exports.handler = void 0;
 const corsHeaders = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "Content-Disposition,Content-Type",
 };
 const jsonResponse = (statusCode, payload) => ({
     statusCode,
@@ -70,6 +71,26 @@ const callAdobeSignAPI = async (accessToken, path, init) => {
     }
     return (await response.json());
 };
+const callAdobeSignBinary = async (accessToken, path, init) => {
+    const url = `${ADOBE_SIGN_BASE_URI}/api/rest/v6${path}`;
+    const response = await fetch(url, {
+        ...init,
+        headers: {
+            ...getAdobeSignHeaders(accessToken),
+            ...(init?.headers || {}),
+        },
+    });
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Adobe Sign API error (${response.status}): ${errorBody}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+        buffer: Buffer.from(arrayBuffer),
+        contentType: response.headers.get("content-type") || "application/pdf",
+        contentDisposition: response.headers.get("content-disposition") || undefined,
+    };
+};
 const handler = async (event) => {
     console.info("adobeSignStatus request received", {
         hasAgreementId: Boolean(event.queryStringParameters?.agreementId),
@@ -84,6 +105,7 @@ const handler = async (event) => {
     try {
         // Get agreementId from query parameter
         const agreementId = event.queryStringParameters?.agreementId;
+        const shouldDownload = event.queryStringParameters?.download?.toLowerCase() === "true";
         if (!agreementId) {
             return jsonResponse(400, {
                 error: "Missing required parameter: agreementId",
@@ -96,6 +118,21 @@ const handler = async (event) => {
             });
         }
         const accessToken = await getAdobeAccessToken();
+        if (shouldDownload) {
+            const binaryDocument = await callAdobeSignBinary(accessToken, `/agreements/${agreementId}/combinedDocument`, { method: "GET" });
+            return {
+                statusCode: 200,
+                headers: {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Expose-Headers": "Content-Disposition,Content-Type",
+                    "Content-Type": binaryDocument.contentType,
+                    "Content-Disposition": binaryDocument.contentDisposition ||
+                        `attachment; filename="agreement-${agreementId}.pdf"`,
+                },
+                isBase64Encoded: true,
+                body: binaryDocument.buffer.toString("base64"),
+            };
+        }
         // Fetch agreement status from Adobe Sign
         const agreement = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}`, { method: "GET" });
         const recipients = agreement.participantSetsInfo
@@ -104,8 +141,14 @@ const handler = async (event) => {
             .map((member) => ({
             email: member.email,
             name: member.name,
+            status: participantSet.status || "UNKNOWN",
+            role: participantSet.role,
+            order: participantSet.order,
         })))
-            .filter((recipient, index, allRecipients) => allRecipients.findIndex((entry) => entry.email === recipient.email) === index) || [];
+            .filter((recipient, index, allRecipients) => {
+            const currentEmail = recipient.email.toLowerCase();
+            return (allRecipients.findIndex((entry) => entry.email.toLowerCase() === currentEmail) === index);
+        }) || [];
         const result = {
             agreementId: agreement.id,
             status: agreement.status,
