@@ -25,6 +25,13 @@ type AgreementStatus = {
 		role?: string;
 		order?: number;
 	}>;
+	recipientProgressFromEvents?: Array<{
+		email: string;
+		name?: string;
+		status?: string;
+		role?: string;
+		order?: number;
+	}>;
 	displayDate?: string;
 	signedDate?: string;
 };
@@ -130,6 +137,12 @@ function ProposalStatusContent() {
 	const statusMessage =
 		STATUS_COPY[statusLabel] || "Status updated. Please review in Adobe account.";
 	const recipients = statusData?.recipients || [];
+	const recipientEventStatusByEmail = new Map(
+		(statusData?.recipientProgressFromEvents || []).map((recipient) => [
+			recipient.email.toLowerCase(),
+			recipient.status,
+		])
+	);
 
 	const handleDownload = async () => {
 		if (!agreementId) {
@@ -169,6 +182,13 @@ function ProposalStatusContent() {
 		}
 
 		return "bg-amber-100 text-amber-700";
+	};
+
+	const getDisplayRecipientStatus = (recipient: {
+		email: string;
+		status?: string;
+	}): string | undefined => {
+		return recipientEventStatusByEmail.get(recipient.email.toLowerCase()) || recipient.status;
 	};
 
 	return (
@@ -217,9 +237,9 @@ function ProposalStatusContent() {
 											&lt;{recipient.email}&gt;
 										</span>
 										<span
-											className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRecipientStatusClassName(recipient.status)}`}
+											className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getRecipientStatusClassName(getDisplayRecipientStatus(recipient))}`}
 										>
-											{getRecipientStatusText(recipient.status)}
+											{getRecipientStatusText(getDisplayRecipientStatus(recipient))}
 										</span>
 									</li>
 								))}

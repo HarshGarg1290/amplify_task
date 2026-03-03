@@ -33,6 +33,13 @@ type StatusResponse = {
 		role?: string;
 		order?: number;
 	}>;
+	recipientProgressFromEvents?: Array<{
+		email: string;
+		name?: string;
+		status?: string;
+		role?: string;
+		order?: number;
+	}>;
 	displayDate?: string;
 	signedDate?: string;
 };

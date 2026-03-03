@@ -11,6 +11,14 @@ const jsonResponse = (statusCode, payload) => ({
     headers: corsHeaders,
     body: JSON.stringify(payload),
 });
+const TERMINAL_AGREEMENT_TO_RECIPIENT_STATUS = {
+    SIGNED: "SIGNED",
+    APPROVED: "SIGNED",
+    CANCELLED: "CANCELLED",
+    ABORTED: "CANCELLED",
+    EXPIRED: "EXPIRED",
+    REJECTED: "REJECTED",
+};
 const ADOBE_SIGN_BASE_URI = process.env.ADOBE_SIGN_BASE_URI || "https://api.na1.adobesign.com";
 const ADOBE_SIGN_ACCESS_TOKEN = process.env.ADOBE_SIGN_ACCESS_TOKEN;
 const ADOBE_SIGN_CLIENT_ID = process.env.ADOBE_SIGN_CLIENT_ID;
@@ -97,20 +105,177 @@ const extractParticipantSets = (payload) => {
         payload.participantSets ||
         []);
 };
+const extractEvents = (payload) => {
+    return payload.events || payload.eventList || payload.agreementEvents || [];
+};
+const getStatusPriority = (status) => {
+    const normalized = (status || "").toUpperCase();
+    if (normalized === "SIGNED" ||
+        normalized === "COMPLETED" ||
+        normalized === "REJECTED" ||
+        normalized === "CANCELLED" ||
+        normalized === "EXPIRED") {
+        return 100;
+    }
+    if (normalized === "OUT_FOR_SIGNATURE") {
+        return 60;
+    }
+    if (normalized === "WAITING_FOR_OTHERS") {
+        return 40;
+    }
+    if (normalized === "ACTIVE") {
+        return 20;
+    }
+    if (normalized === "UNKNOWN" || normalized.length === 0) {
+        return 0;
+    }
+    return 30;
+};
+const getBetterStatus = (currentStatus, incomingStatus) => {
+    return getStatusPriority(incomingStatus) >= getStatusPriority(currentStatus)
+        ? incomingStatus
+        : currentStatus;
+};
+const getEventTypeToken = (event) => [
+    event.type,
+    event.eventType,
+    event.name,
+    event.status,
+]
+    .filter(Boolean)
+    .join("_")
+    .toUpperCase();
+const getEventEmail = (event) => event.participantEmail ||
+    event.actingUserEmail ||
+    event.userEmail ||
+    event.email;
+const getEventName = (event) => event.participantName || event.actingUserName || event.userName;
+const mapEventToRecipientStatus = (event) => {
+    const token = getEventTypeToken(event);
+    if (/ACTION_REQUESTED/.test(token)) {
+        return "OUT_FOR_SIGNATURE";
+    }
+    if (/SIGN|ESIGN|APPROV/.test(token)) {
+        return "SIGNED";
+    }
+    if (/REJECT|DECLIN/.test(token)) {
+        return "REJECTED";
+    }
+    if (/CANCEL|ABORT|VOID/.test(token)) {
+        return "CANCELLED";
+    }
+    if (/EXPIRE/.test(token)) {
+        return "EXPIRED";
+    }
+    return undefined;
+};
+const buildRecipientsFromEvents = (events) => {
+    const recipientMap = new Map();
+    for (const event of events) {
+        const statusFromEvent = mapEventToRecipientStatus(event);
+        const email = getEventEmail(event);
+        if (!email || !statusFromEvent) {
+            continue;
+        }
+        const key = email.toLowerCase();
+        const existing = recipientMap.get(key);
+        recipientMap.set(key, {
+            email,
+            name: getEventName(event) || existing?.name,
+            status: getBetterStatus(existing?.status, statusFromEvent),
+            role: (event.participantRole || event.role || existing?.role),
+            order: existing?.order,
+        });
+    }
+    return Array.from(recipientMap.values());
+};
+const getMemberStatus = (member) => member.status || member.signingStatus || member.participantStatus || member.state;
+const getParticipantSetStatus = (participantSet) => participantSet.status ||
+    participantSet.signingStatus ||
+    participantSet.participantStatus ||
+    participantSet.state;
 const buildRecipientsFromParticipantSets = (participantSets) => {
     return participantSets
-        .flatMap((participantSet) => (participantSet.memberInfos || participantSet.members || [])
+        .flatMap((participantSet) => (participantSet.memberInfos ||
+        participantSet.participantSetMemberInfos ||
+        participantSet.members ||
+        [])
         .filter((member) => Boolean(member.email))
         .map((member) => ({
         email: member.email,
         name: member.name,
-        status: member.status || participantSet.status || "UNKNOWN",
+        status: getMemberStatus(member) ||
+            getParticipantSetStatus(participantSet) ||
+            "UNKNOWN",
         role: participantSet.role,
         order: participantSet.order,
     })))
         .filter((recipient, index, allRecipients) => {
         const currentEmail = recipient.email.toLowerCase();
         return (allRecipients.findIndex((entry) => entry.email.toLowerCase() === currentEmail) === index);
+    });
+};
+const mergeRecipients = (agreementRecipients, memberRecipients, eventRecipients) => {
+    const recipientMap = new Map();
+    for (const recipient of agreementRecipients) {
+        recipientMap.set(recipient.email.toLowerCase(), { ...recipient });
+    }
+    for (const sourceRecipients of [memberRecipients, eventRecipients]) {
+        for (const recipient of sourceRecipients) {
+            const key = recipient.email.toLowerCase();
+            const existing = recipientMap.get(key);
+            recipientMap.set(key, {
+                email: recipient.email,
+                name: recipient.name || existing?.name,
+                status: getBetterStatus(existing?.status, recipient.status),
+                role: recipient.role || existing?.role,
+                order: recipient.order ?? existing?.order,
+            });
+        }
+    }
+    return Array.from(recipientMap.values());
+};
+const normalizeRecipientStatuses = (recipients, agreementStatus, nextParticipantSets) => {
+    const terminalRecipientStatus = TERMINAL_AGREEMENT_TO_RECIPIENT_STATUS[agreementStatus.toUpperCase()];
+    if (terminalRecipientStatus) {
+        return recipients.map((recipient) => ({
+            ...recipient,
+            status: terminalRecipientStatus,
+        }));
+    }
+    const pendingRecipients = buildRecipientsFromParticipantSets(nextParticipantSets);
+    if (pendingRecipients.length === 0) {
+        return recipients;
+    }
+    const pendingEmailSet = new Set(pendingRecipients.map((recipient) => recipient.email.toLowerCase()));
+    const pendingOrderValues = pendingRecipients
+        .map((recipient) => recipient.order)
+        .filter((order) => typeof order === "number");
+    const currentPendingOrder = pendingOrderValues.length > 0 ? Math.min(...pendingOrderValues) : undefined;
+    return recipients.map((recipient) => {
+        const emailKey = recipient.email.toLowerCase();
+        if (pendingEmailSet.has(emailKey)) {
+            return {
+                ...recipient,
+                status: "OUT_FOR_SIGNATURE",
+            };
+        }
+        if (typeof recipient.order === "number" &&
+            typeof currentPendingOrder === "number") {
+            if (recipient.order < currentPendingOrder) {
+                return {
+                    ...recipient,
+                    status: "SIGNED",
+                };
+            }
+            if (recipient.order > currentPendingOrder) {
+                return {
+                    ...recipient,
+                    status: "WAITING_FOR_OTHERS",
+                };
+            }
+        }
+        return recipient;
     });
 };
 const handler = async (event) => {
@@ -125,15 +290,14 @@ const handler = async (event) => {
         });
     }
     try {
-        // Get agreementId from query parameter
         const agreementId = event.queryStringParameters?.agreementId;
         const shouldDownload = event.queryStringParameters?.download?.toLowerCase() === "true";
+        const debugMode = event.queryStringParameters?.debug?.toLowerCase() === "true";
         if (!agreementId) {
             return jsonResponse(400, {
                 error: "Missing required parameter: agreementId",
             });
         }
-        // Validate agreementId format (basic check)
         if (agreementId.length === 0 || agreementId.length > 128) {
             return jsonResponse(400, {
                 error: "Invalid agreementId format",
@@ -155,16 +319,21 @@ const handler = async (event) => {
                 body: binaryDocument.buffer.toString("base64"),
             };
         }
-        // Fetch agreement status from Adobe Sign
         const agreement = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}`, { method: "GET" });
-        let recipients = buildRecipientsFromParticipantSets(agreement.participantSetsInfo || []);
-        const hasKnownRecipientStatus = recipients.some((recipient) => recipient.status && recipient.status !== "UNKNOWN");
-        if (!hasKnownRecipientStatus) {
-            const agreementMembers = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}/members`, { method: "GET" });
-            const memberRecipients = buildRecipientsFromParticipantSets(extractParticipantSets(agreementMembers));
-            if (memberRecipients.length > 0) {
-                recipients = memberRecipients;
-            }
+        const recipients = buildRecipientsFromParticipantSets(agreement.participantSetsInfo || []);
+        let recipientsFromEvents = [];
+        let agreementEvents = [];
+        const debugWarnings = [];
+        try {
+            const eventsPayload = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}/events`, { method: "GET" });
+            agreementEvents = extractEvents(eventsPayload);
+            recipientsFromEvents = buildRecipientsFromEvents(agreementEvents);
+        }
+        catch (eventsError) {
+            const eventsMessage = eventsError instanceof Error
+                ? eventsError.message
+                : "Unknown events error";
+            debugWarnings.push(`events: ${eventsMessage}`);
         }
         const result = {
             agreementId: agreement.id,
@@ -174,12 +343,43 @@ const handler = async (event) => {
             senderEmail: agreement.senderEmail || agreement.creatorEmail,
             senderName: agreement.senderName,
             recipients,
+            recipientProgressFromEvents: recipientsFromEvents,
             displayDate: agreement.displayDate,
             signedDate: agreement.signedDate,
         };
+        if (debugMode) {
+            let recipientsFromMembers = [];
+            try {
+                const agreementMembers = await callAdobeSignAPI(accessToken, `/agreements/${agreementId}/members`, { method: "GET" });
+                recipientsFromMembers = buildRecipientsFromParticipantSets(extractParticipantSets(agreementMembers));
+            }
+            catch (membersError) {
+                const membersMessage = membersError instanceof Error
+                    ? membersError.message
+                    : "Unknown members error";
+                debugWarnings.push(`members: ${membersMessage}`);
+            }
+            const eventTypeSample = agreementEvents.slice(0, 25).map((event) => ({
+                type: event.type || event.eventType || event.name || event.status,
+                email: getEventEmail(event),
+            }));
+            return jsonResponse(200, {
+                ...result,
+                debug: {
+                    agreementStatus: agreement.status,
+                    recipientsRawFromAgreement: recipients,
+                    recipientsFromMembers,
+                    recipientsFromEvents,
+                    agreementEventsCount: agreementEvents.length,
+                    eventTypeSample,
+                    warnings: debugWarnings,
+                },
+            });
+        }
         console.info("Adobe agreement status fetched", {
             agreementId,
             status: result.status,
+            recipientsCount: result.recipients?.length || 0,
         });
         return jsonResponse(200, result);
     }
