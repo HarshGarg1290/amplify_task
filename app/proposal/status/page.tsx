@@ -34,6 +34,15 @@ const STATUS_COPY: Record<string, string> = {
 	SIGNED: "Signed successfully.",
 	CANCELLED: "Agreement was cancelled.",
 	EXPIRED: "Agreement has expired.",
+	OUT_FOR_SIGNATURE: "Agreement is pending signature.",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+	IN_PROCESS: "In Process",
+	SIGNED: "Signed",
+	CANCELLED: "Cancelled",
+	EXPIRED: "Expired",
+	OUT_FOR_SIGNATURE: "Pending Signature",
 };
 
 const RECIPIENT_STATUS_COPY: Record<string, string> = {
@@ -43,7 +52,7 @@ const RECIPIENT_STATUS_COPY: Record<string, string> = {
 	WAITING_FOR_AUTHORING: "Waiting",
 	WAITING_FOR_PREFILL: "Waiting",
 	WAITING_FOR_OTHERS: "Waiting",
-	OUT_FOR_SIGNATURE: "Pending",
+	OUT_FOR_SIGNATURE: "Pending Signature",
 	NOT_YET_VISIBLE: "Pending",
 	ACTIVE: "Pending",
 	CANCELLED: "Cancelled",
@@ -117,6 +126,7 @@ function ProposalStatusContent() {
 	}, [agreementId]);
 
 	const statusLabel = statusData?.status || "UNKNOWN";
+	const normalizedStatusLabel = STATUS_LABELS[statusLabel] || statusLabel;
 	const statusMessage =
 		STATUS_COPY[statusLabel] || "Status updated. Please review in Adobe account.";
 	const recipients = statusData?.recipients || [];
@@ -183,7 +193,7 @@ function ProposalStatusContent() {
 						</div>
 						<div className="rounded-lg border border-gray-200 p-4 bg-blue-50/40">
 							<p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Current Status</p>
-							<p className="text-blue-700 font-semibold">{statusLabel}</p>
+							<p className="text-blue-700 font-semibold">{normalizedStatusLabel}</p>
 							<p className="text-gray-600 mt-1">{statusMessage}</p>
 						</div>
 						<div className="rounded-lg border border-gray-200 p-4">

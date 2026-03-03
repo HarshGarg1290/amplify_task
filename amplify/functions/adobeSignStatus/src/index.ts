@@ -51,6 +51,26 @@ interface AgreementStatusResponse {
 	signedDate?: string;
 }
 
+type AdobeMemberInfo = {
+	email?: string;
+	name?: string;
+	status?: string;
+};
+
+type AdobeParticipantSetInfo = {
+	status?: string;
+	role?: string;
+	order?: number;
+	memberInfos?: AdobeMemberInfo[];
+	members?: AdobeMemberInfo[];
+};
+
+type AdobeAgreementMembersResponse = {
+	participantSetsInfo?: AdobeParticipantSetInfo[];
+	participantSetInfos?: AdobeParticipantSetInfo[];
+	participantSets?: AdobeParticipantSetInfo[];
+};
+
 const ADOBE_SIGN_BASE_URI =
 	process.env.ADOBE_SIGN_BASE_URI || "https://api.na1.adobesign.com";
 const ADOBE_SIGN_ACCESS_TOKEN = process.env.ADOBE_SIGN_ACCESS_TOKEN;
@@ -166,6 +186,48 @@ const callAdobeSignBinary = async (
 	};
 };
 
+const extractParticipantSets = (
+	payload: AdobeAgreementMembersResponse
+): AdobeParticipantSetInfo[] => {
+	return (
+		payload.participantSetsInfo ||
+		payload.participantSetInfos ||
+		payload.participantSets ||
+		[]
+	);
+};
+
+const buildRecipientsFromParticipantSets = (
+	participantSets: AdobeParticipantSetInfo[]
+): Array<{
+	email: string;
+	name?: string;
+	status?: string;
+	role?: string;
+	order?: number;
+}> => {
+	return participantSets
+		.flatMap((participantSet) =>
+			(participantSet.memberInfos || participantSet.members || [])
+				.filter((member) => Boolean(member.email))
+				.map((member) => ({
+					email: member.email as string,
+					name: member.name,
+					status: member.status || participantSet.status || "UNKNOWN",
+					role: participantSet.role,
+					order: participantSet.order,
+				}))
+		)
+		.filter((recipient, index, allRecipients) => {
+			const currentEmail = recipient.email.toLowerCase();
+			return (
+				allRecipients.findIndex(
+					(entry) => entry.email.toLowerCase() === currentEmail
+				) === index
+			);
+		});
+};
+
 export const handler = async (
 	event: ApiGatewayEvent
 ): Promise<ApiGatewayResult> => {
@@ -235,39 +297,34 @@ export const handler = async (
 			senderEmail?: string;
 			senderName?: string;
 			creatorEmail?: string;
-			participantSetsInfo?: Array<{
-				status?: string;
-				role?: string;
-				order?: number;
-				memberInfos?: Array<{ email?: string; name?: string }>;
-			}>;
+			participantSetsInfo?: AdobeParticipantSetInfo[];
 			displayDate?: string;
 			signedDate?: string;
 		}>(accessToken, `/agreements/${agreementId}`, { method: "GET" });
 
-		const recipients =
-			agreement.participantSetsInfo
-				?.flatMap((participantSet) =>
-					(participantSet.memberInfos || [])
-						.filter((member) => Boolean(member.email))
-						.map((member) => ({
-							email: member.email as string,
-							name: member.name,
-							status: participantSet.status || "UNKNOWN",
-							role: participantSet.role,
-							order: participantSet.order,
-						}))
-				)
-				.filter(
-					(recipient, index, allRecipients) => {
-						const currentEmail = recipient.email.toLowerCase();
-						return (
-							allRecipients.findIndex(
-								(entry) => entry.email.toLowerCase() === currentEmail
-							) === index
-						);
-					}
-				) || [];
+		let recipients = buildRecipientsFromParticipantSets(
+			agreement.participantSetsInfo || []
+		);
+
+		const hasKnownRecipientStatus = recipients.some(
+			(recipient) => recipient.status && recipient.status !== "UNKNOWN"
+		);
+
+		if (!hasKnownRecipientStatus) {
+			const agreementMembers = await callAdobeSignAPI<AdobeAgreementMembersResponse>(
+				accessToken,
+				`/agreements/${agreementId}/members`,
+				{ method: "GET" }
+			);
+
+			const memberRecipients = buildRecipientsFromParticipantSets(
+				extractParticipantSets(agreementMembers)
+			);
+
+			if (memberRecipients.length > 0) {
+				recipients = memberRecipients;
+			}
+		}
 
 		const result: AgreementStatusResponse = {
 			agreementId: agreement.id,
